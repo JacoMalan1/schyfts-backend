@@ -55,6 +55,41 @@ const error_codes = {
 
 app.use(express.json());
 
+app.post('/getSharedModules', async (req, res) => {
+
+    let body = req.body;
+    let token = body.token;
+
+    if (!token) {
+        res.status(400).json({ status: "error", code: 11, message: error_codes[11] }).end();
+        return;
+    }
+
+    if (!token.match(TOKEN_FORMAT)) {
+        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        return;
+    }
+
+    let user = await User.fromToken(token);
+    if (!user) {
+        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        return;
+    }
+
+    if (user.perm > 19) {
+        res.status(200).json({ status: "error", code: 1, message: error_codes[1] }).end();
+        return;
+    }
+
+    try {
+        let results = await sqlQuery("SELECT * FROM tblSharedModules;");
+        res.status(200).json({ status: "ok", message: `Got ${results.length} shared modules`, results }).end();
+    } catch (e) {
+        res.status(500).json({ status: "error", message: `Internal server error (${JSON.stringify(e)})` }).end();
+    }
+
+});
+
 app.post('/editDoctor', async (req, res) => {
 
     let body = req.body;
@@ -319,6 +354,7 @@ app.post('/editLeave', async (req, res) => {
     let body = req.body;
     let token = body.token;
     let dID = body.dID;
+    let startDate = body.startDate;
     let edit = body.edit;
 
     if (!token) {
@@ -359,6 +395,9 @@ app.post('/editLeave', async (req, res) => {
         sqlString = sqlString.substr(0, sqlString.length - 2);
     }
 
+    sqlString += "WHERE dID = ? AND start = ?";
+    fields.push(dID, startDate);
+
     try {
         await sqlQuery(sqlString, fields);
     } catch (e) {
@@ -367,6 +406,45 @@ app.post('/editLeave', async (req, res) => {
     }
 
     res.status(200).json({ status: "ok", message: "Edit successfull", ack: edit }).end();
+
+});
+
+app.post('/deleteLeave', async (req, res) => {
+
+    let body = req.body;
+    let token = body.token;
+    let dID = body.dID;
+    let startDate = body.startDate;
+
+    if (!token) {
+        res.status(400).json({ status: "error", code: 11, message: error_codes[11] });
+        return;
+    }
+
+    if (!token.match(TOKEN_FORMAT)) {
+        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        return;
+    }
+
+    let user = await User.fromToken(token);
+    if (!user) {
+        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        return;
+    }
+
+    if (user.perm > 27) {
+        res.status(200).json({ status: "error", code: 1, message: error_codes[1] }).end();
+        return;
+    }
+
+    try {
+        await sqlQuery("DELETE FROM tblLeave WHERE dID = ? AND DATE(start) = DATE(?);", [dID, startDate]);
+    } catch (e) {
+        res.status(500).json({ status: "error", message: `SQL Query failed with: (${e})` }).end();
+        return;
+    }
+
+    res.status(200).json({ status: "ok", message: `Deleted leave starting at ${startDate} for dID: ${dID}` }).end();
 
 });
 
@@ -444,6 +522,163 @@ app.post('/getDoctor', async (req, res) => {
 
 });
 
+app.post('/getAllUsers', async (req, res) => {
+
+    let body = req.body;
+    let token = body.token;
+
+    if (!token) {
+        res.status(400).json({ status: "error", code: 11, message: error_codes[11] }).end();
+        return;
+    }
+
+    if (!token.match(TOKEN_FORMAT)) {
+        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        return;
+    }
+
+    let user = await User.fromToken(token);
+    if (!user) {
+        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        return;
+    }
+
+    if (user.perm > 10) {
+        res.status(200).json({ status: "error", code: 1, message: error_codes[1] });
+        return;
+    }
+
+    try {
+
+        let results = await sqlQuery("SELECT uID, uName, uEmail, uPerm FROM tblUsers;");
+        res.status(200).json({ status: "ok", message: `Got ${results.length} results`, results });
+
+    } catch (e) {
+        res.status(500).json({ status: "error", message: `Internal server error: ${JSON.stringify(e)}`}).end();
+    }
+
+});
+
+app.post('/getSetting', async (req, res) => {
+    let body = req.body;
+    let token = body.token;
+    let key = body.key;
+
+    if (!token || !key) {
+        res.status(400).json({status: "error", code: 11, message: error_codes[11]}).end();
+        return;
+    }
+
+    if (!token.match(TOKEN_FORMAT)) {
+        res.status(400).json({status: "error", code: 25, message: error_codes[25]}).end();
+        return;
+    }
+
+    let user = await User.fromToken(token);
+    if (!user) {
+        res.status(400).json({status: "error", code: 25, message: error_codes[25]}).end();
+        return;
+    }
+
+    try {
+        let result = await sqlQuery("SELECT * FROM tblOptions WHERE key_string = ?", [key]);
+        result = result[0];
+        res.status(200).json({ status: "ok", message: "Fetched setting value", result }).end();
+    } catch (e) {
+        res.status(500).json({ status: "error", message: `Internal server error: ${JSON.stringify(e)}` }).end();
+    }
+
+});
+
+app.post('/setSetting', async (req, res) => {
+    let body = req.body;
+    let token = body.token;
+    let key = body.key;
+    let value = body.value;
+
+    if (!token || key === undefined || value === undefined) {
+        res.status(400).json({status: "error", code: 11, message: error_codes[11]}).end();
+        return;
+    }
+
+    if (!token.match(TOKEN_FORMAT)) {
+        res.status(400).json({status: "error", code: 25, message: error_codes[25]}).end();
+        return;
+    }
+
+    let user = await User.fromToken(token);
+    if (!user) {
+        res.status(400).json({status: "error", code: 25, message: error_codes[25]}).end();
+        return;
+    }
+
+    try {
+        let result = await sqlQuery("SELECT * FROM tblOptions WHERE key_string = ?", [key]);
+        if (result.length !== 0) {
+            await sqlQuery("UPDATE tblOptions SET `value` = ? WHERE key_string = ?", [value, key]);
+            res.status(200).json({ status: "ok", message: "Setting updated", ack: { key_string: key, value } });
+        } else {
+            await sqlQuery("INSERT INTO tblOptions (key_string, `value`) VALUES (?, ?)", [key, value]);            res.status(200).json({ status: "ok", message: "Setting updated", ack: { key, value } });
+            res.status(200).json({ status: "ok", message: "Setting created", ack: { key_string: key, value } });
+        }
+    } catch (e) {
+        res.status(500).json({ status: "error", message: `Internal server error: ${JSON.stringify(e)}` });
+    }
+
+});
+
+app.post('/editUser', async (req, res) => {
+
+    let body = req.body;
+    let token = body.token;
+    let uID = body.uID;
+    let edit = body.edit;
+
+    if (!token || !uID || !edit) {
+        res.status(400).json({ status: "error", code: 11, message: error_codes[11] }).end();
+        return;
+    }
+
+    if (!token.match(TOKEN_FORMAT)) {
+        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        return;
+    }
+
+    let user = await User.fromToken(token);
+    if (!user) {
+        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        return;
+    }
+
+    if (user.perm > 9) {
+        res.status(200).json({ status: "error", code: 1, message: error_codes[1] });
+        return;
+    }
+
+    let sqlString = "UPDATE tblUsers SET ";
+    let params = [];
+    if (edit.uEmail) {
+        sqlString += "uEmail = ?, ";
+        params.push(edit.uEmail);
+    }
+    if (edit.uPerm !== undefined) {
+        sqlString += "uPerm = ?";
+        params.push(edit.uPerm);
+    } else {
+        sqlString = sqlString.substr(0, sqlString.length - 2);
+    }
+    sqlString += " WHERE uID = ?;";
+    params.push(uID);
+
+    try {
+        await sqlQuery(sqlString, params);
+        res.status(200).json({ status: "ok", message: `User (id: ${uID}) edited`, ack: edit }).end();
+    } catch (e) {
+        res.status(500).json({ status: "error", message: `Internal server error: ${JSON.stringify(e)}` });
+    }
+
+});
+
 app.post('/login', (req, res) => {
 
     let body = req.body;
@@ -456,7 +691,7 @@ app.post('/login', (req, res) => {
     let pword = body.pword;
     let uname = body.uname;
 
-    sqlConnection.query('SELECT uID, uHash FROM tblUsers WHERE uName = ?', [uname], (err, results) => {
+    sqlConnection.query('SELECT uID, uPerm, uHash FROM tblUsers WHERE uName = ?', [uname], (err, results) => {
         if (err) {
             res.json({ status: 'error', code: 21, message: error_codes[21] }).end();
         } else {
@@ -468,6 +703,7 @@ app.post('/login', (req, res) => {
 
             let hash = results[0].uHash;
             let uID = results[0].uID;
+            let uPerm = results[0].uPerm;
             bcrypt.compare(pword, hash, (error, same) => {
                 if (same) {
                     console.log(`Successful login (${uname})`);
@@ -480,7 +716,7 @@ app.post('/login', (req, res) => {
                         err => { if (err) console.error(err); }
                     );
 
-                    res.json({ status: 'ok', message: 'Logged in', token }).end();
+                    res.json({ status: 'ok', message: 'Logged in', token, permissionLevel: uPerm }).end();
                 } else {
                     console.log(`Login failed (${uname})`);
                     res.json({ status: 'error', code: 22, message: error_codes[22] }).end();
