@@ -1,5 +1,3 @@
-//Srequire('@google-cloud/debug-agent').start({ serviceContext: { enableCanary: false } });
-
 // ========= MODULES ========== //
 const uuid      = require('uuid');
 const express   = require('express');
@@ -54,6 +52,118 @@ const error_codes = {
 };
 
 app.use(express.json());
+
+app.post('/deleteSurgeonLeave', async (req, res) => {
+    let body = req.body;
+    let token = body.token;
+    let surname = body.surname;
+    let startDate = body.startDate;
+
+    if (!token || !name || !surname || !startDate) {
+        res.status(400).json({ status: "error", code: 11, message: error_codes[11] }).end();
+        return;
+    }
+
+    if (!token.match(TOKEN_FORMAT)) {
+        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        return;
+    }
+
+    let user = await User.fromToken(token);
+    if (!user) {
+        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        return;
+    }
+
+    if (user.perm > 29) {
+        res.status(200).json({ status: "error", code: 1, message: error_codes[1] }).end();
+        return;
+    }
+
+    try {
+        await sqlQuery("DELETE FROM tblSureonLeave WHERE surname = ? AND start = ?", [surname, startDate]);
+        res.status(200).json({ status: "ok", message: "Surgeon leave removed" }).end();
+    } catch (e) {
+        res.status(500).json({ status: "error", message: e }).end();
+    }
+
+});
+
+app.post('/addSurgeonLeave', async (req, res) => {
+
+    let body = req.body;
+    let token = body.token;
+    let name = body.name;
+    let surname = body.surname;
+    let startDate = body.startDate;
+    let endDate = body.endDate;
+
+    if (!token || !name || !surname || !startDate || !endDate) {
+        res.status(400).json({ status: "error", code: 11, message: error_codes[11] }).end();
+        return;
+    }
+
+    if (!token.match(TOKEN_FORMAT)) {
+        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        return;
+    }
+
+    let user = await User.fromToken(token);
+    if (!user) {
+        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        return;
+    }
+
+    if (user.perm > 29) {
+        res.status(200).json({ status: "error", code: 1, message: error_codes[1] }).end();
+        return;
+    }
+
+    try {
+        await sqlQuery("INSERT INTO tblSurgeonLeave (name, surname, start, end) VALUES (?, ?, ?, ?);",
+            [name, surname, startDate, endDate]);
+        res.status(200).json({ status: "ok", message: "Surgeon leave added" }).end();
+    } catch (e) {
+        res.status(500).json({ status: "error", message: e }).end();
+    }
+
+});
+
+app.post('/getAllSurgeonLeave', async (req, res) => {
+
+    let body = req.body;
+    let token = body.token;
+
+    if (!token) {
+        res.status(400).json({ status: "error", code: 11, message: error_codes[11] }).end();
+        return;
+    }
+
+    if (!token.match(TOKEN_FORMAT)) {
+        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        return;
+    }
+
+    let user = await User.fromToken(token);
+    if (!user) {
+        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        return;
+    }
+
+    if (user.perm > 30) {
+        res.status(200).json({ status: "error", code: 1, message: error_codes[1] }).end();
+        return;
+    }
+
+
+    try {
+        let results = await sqlQuery("SELECT * FROM tblSurgeonLeave;");
+        res.status(200).json({ status: "ok", results }).end();
+    } catch (e) {
+        res.status(500).json({ status: "error", message: e }).end();
+    }
+
+});
 
 app.post('/getSharedModules', async (req, res) => {
 
