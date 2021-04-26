@@ -59,7 +59,7 @@ app.post('/deleteSurgeonLeave', async (req, res) => {
     let surname = body.surname;
     let startDate = body.startDate;
 
-    if (!token || !name || !surname || !startDate) {
+    if (!token || !surname || !startDate) {
         res.status(400).json({ status: "error", code: 11, message: error_codes[11] }).end();
         return;
     }
@@ -81,12 +81,11 @@ app.post('/deleteSurgeonLeave', async (req, res) => {
     }
 
     try {
-        await sqlQuery("DELETE FROM tblSureonLeave WHERE surname = ? AND start = ?", [surname, startDate]);
-        res.status(200).json({ status: "ok", message: "Surgeon leave removed" }).end();
+        await sqlQuery("DELETE FROM tblSurgeonLeave WHERE surname = ? AND start = ?", [surname, startDate]);
     } catch (e) {
         res.status(500).json({ status: "error", message: e }).end();
     }
-
+    res.status(200).json({ status: "ok", message: "Surgeon leave removed" }).end();
 });
 
 app.post('/addSurgeonLeave', async (req, res) => {
