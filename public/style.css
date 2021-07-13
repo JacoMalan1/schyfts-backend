@@ -1,0 +1,33 @@
+* {
+    font-family: monospace;
+}
+h1 {
+    text-align: center;
+}
+table {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: 'Comic Sans MS', serif;
+    font-size: 17px;
+
+}
+th, td {
+    border: 1px solid;
+    text-align: left;
+    padding: 8px;
+}
+#ScheduleHeading{
+    text-align: center;
+    padding-left: 700px;
+    padding-top: 100px;
+}
+#Logo{
+    alignment: left;
+    vertical-align: top;
+}
+#InfoBanner{
+    text-align: center;
+}
+#WeekStarting{
+    text-align: left;
+}

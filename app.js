@@ -6,6 +6,7 @@ const fs        = require('fs');
 const mysql     = require('mysql');
 const User      = require('./user.js');
 const sqlQuery  = require('./sql.js');
+const {Storage} = require('@google-cloud/storage')
 // ============================ //
 
 require('dotenv').config();
@@ -51,7 +52,85 @@ const error_codes = {
     42: 'Invalid cellphone number'
 };
 
+const storage = new Storage({ keyFilename: 'webapp-service-account.json' });
+
+app.use(express.static("public"));
 app.use(express.json());
+app.set('views', './views');
+app.set('view engine', 'ejs')
+
+function min(x, y) {
+    return (x > y) ? y : x;
+}
+
+
+app.get('/printOut/:id/:sr/:ws', async (req, res) => {
+
+    let bucket = storage.bucket('nelanest-roster');
+    let file = bucket.file(`render_tmp/${req.params.id}.scsv`);
+    file.download(async (err, contents) => {
+
+        if (err !== null) {
+            res.status(404).send("Couldn't find a roster with that ID!");
+        }
+
+        let tableContents = '';
+        let lines = contents.toString().split('\n');
+        let header = lines[0].split(',');
+
+        tableContents += '<colgroup>'
+        for (let i = 0; i < header.length; i++) {
+            tableContents += '<col style="width:50px;">\n';
+        }
+        tableContents += '</colgroup>\n';
+
+        tableContents += '<thead>';
+        for (let i = 0; i < header.length; i++) {
+            if (header[i] === '')
+                continue;
+            let span = (header[i + 1] === '') ? 2 : 1;
+            tableContents += `<th style="text-align:center;" colspan=${span}>${header[i]}</th>`;
+        }
+        tableContents += '</thead>\n';
+
+        for (let i = 1; i < lines.length - 1; i++) {
+            let fields = lines[i].split(',');
+            tableContents += '<tr>';
+
+            for (let f of fields) {
+                let bg = (f[0] === '#') ? "green" : "white";
+                let sub = (f[0] === '#') ? 1 : 0;
+                tableContents +=
+                    `<td style="height:50px;background:${bg};">${f.substr(sub, 15)}</td>`;
+            }
+
+            tableContents += '</tr>\n';
+        }
+
+        let doctors = await sqlQuery("SELECT * FROM tblDoctors ORDER BY surname");
+        let doctorTableData = '<tr>';
+        let columns = 0;
+        for (let d of doctors) {
+            if (columns === 4) {
+                columns = 0;
+                doctorTableData += "</tr><tr>";
+            }
+            doctorTableData += `<td>${d.surname}</td><td>${d.shortcode}</td>`;
+            columns++;
+        }
+        doctorTableData += '</tr>';
+
+        res.render('index', {
+            scheduleHeading: 'Schedule from: ' + decodeURIComponent(req.params.sr).replace('+', ' '),
+            weekStarting: 'Week starting: ' + decodeURIComponent(req.params.ws),
+            pageTitle: 'Schyfts Renderer',
+            tableData: tableContents,
+            doctorInfo: doctorTableData
+        });
+
+    });
+
+});
 
 app.post('/deleteSurgeonLeave', async (req, res) => {
     let body = req.body;
