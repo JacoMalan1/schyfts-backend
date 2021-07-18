@@ -63,7 +63,6 @@ function min(x, y) {
     return (x > y) ? y : x;
 }
 
-
 app.get('/printOut/:id/:sr/:ws', async (req, res) => {
 
     let bucket = storage.bucket('nelanest-roster');
@@ -98,10 +97,10 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
             tableContents += '<tr>';
 
             for (let f of fields) {
-                let bg = (f[0] === '#') ? "green" : "white";
+                let bg = (f[0] === '#') ? "#4ca644" : "white";
                 let sub = (f[0] === '#') ? 1 : 0;
                 tableContents +=
-                    `<td style="height:50px;background:${bg};">${f.substr(sub, 15)}</td>`;
+                    `<td style="height:40px;background:${bg};">${f.substr(sub, 15)}</td>`;
             }
 
             tableContents += '</tr>\n';
@@ -111,7 +110,7 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
         let doctorTableData = '<tr>';
         let columns = 0;
         for (let d of doctors) {
-            if (columns === 4) {
+            if (columns === 6) {
                 columns = 0;
                 doctorTableData += "</tr><tr>";
             }
@@ -120,8 +119,10 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
         }
         doctorTableData += '</tr>';
 
+        let scheduleHeading = new String('Schedule from: ' + decodeURIComponent(req.params.sr));
+        scheduleHeading = scheduleHeading.replace(/\+/g, ' ');
         res.render('index', {
-            scheduleHeading: 'Schedule from: ' + decodeURIComponent(req.params.sr).replace('+', ' '),
+            scheduleHeading,
             weekStarting: 'Week starting: ' + decodeURIComponent(req.params.ws),
             pageTitle: 'Schyfts Renderer',
             tableData: tableContents,
