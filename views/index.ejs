@@ -1,8 +1,16 @@
 <html lang="en">
-    
     <head>
         <title><%= pageTitle %></title>
         <style>
+            @media print {
+                @page {
+                    size: landscape;
+                    margin: 0 1.6cm 0 1.6cm;
+                }
+                body {
+                    margin: 1.6cm 0 1.6cm 0;
+                }
+            }
             * {
                 font-family: 'Times New Roman', serif;
             }
@@ -34,8 +42,6 @@
             #Logo {
                 alignment: left;
                 vertical-align: top;
-                width: 20%;
-                height: 10%;
                 padding-top: 0;
                 padding-bottom: 0;
             }
@@ -56,11 +62,11 @@
     <body>
 
         <h1 id="ScheduleHeading"><%= scheduleHeading %></h1>
-        <img id="Logo" src="/nelanest.png">
+        <img id="Logo" src="/nelanest.png" width="300" height="64">
         <h2 id="InfoBanner">Suite 102, Sonheuwel Rooms, Nelspruit Mediclinic, Phone (013 745 7082) Email: nelanest@telkomsa.net</h2>
         <h2 id="WeekStarting"><%= weekStarting %></h2>
 
-        <table style="width: 70%" id="datatable">
+        <table style="width: 70%;" id="datatable">
             <%- tableData %>
         </table>
         
@@ -71,6 +77,10 @@
             <%- doctorInfo %>
 
         </table>
+
+        <script>
+            window.print();
+        </script>
 
     </body>
 </html>

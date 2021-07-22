@@ -67,7 +67,7 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
 
     let bucket = storage.bucket('nelanest-roster');
     let file = bucket.file(`render_tmp/${req.params.id}.scsv`);
-    file.download(async (err, contents) => {
+    await file.download(async (err, contents) => {
 
         if (err !== null) {
             res.status(404).send("Couldn't find a roster with that ID!");
@@ -119,10 +119,9 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
         }
         doctorTableData += '</tr>';
 
-        let scheduleHeading = new String('Schedule from: ' + decodeURIComponent(req.params.sr));
-        scheduleHeading = scheduleHeading.replace(/\+/g, ' ');
+
         res.render('index', {
-            scheduleHeading,
+            scheduleHeading: req.params.sr.replace(/\+/g, ' '),
             weekStarting: 'Week starting: ' + decodeURIComponent(req.params.ws),
             pageTitle: 'Schyfts Renderer',
             tableData: tableContents,
@@ -234,6 +233,21 @@ app.post('/getAllSurgeonLeave', async (req, res) => {
         return;
     }
 
+app.get('/cleanUp', async (req, res) => {
+    let bucket = storage.bucket('nelanest-roster');
+    bucket.getFiles({ prefix: 'render_tmp' })
+    .then(files => {
+        files = files[0];
+        for (let i = 0; i < files.length; i++) {
+            console.log(`Deleting file ${files[i].name}...`);
+            files[i].delete().catch(err => console.log(err));
+        }
+        res.status(200).json({ status: "ok", message: `Deleted ${files.length} files from "render_tmp/"` });
+    }).catch(err => {
+        res.status(500).json({ status: "error", message: "An unknown error has occurred" });
+        console.error(err);
+    });
+});
 
     try {
         let results = await sqlQuery("SELECT * FROM tblSurgeonLeave;");
