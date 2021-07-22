@@ -76,6 +76,7 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
         let tableContents = '';
         let lines = contents.toString().split('\n');
         let header = lines[0].split(',');
+        let doctorNames = lines[1].split(',');
 
         tableContents += '<colgroup>'
         for (let i = 0; i < header.length; i++) {
@@ -92,7 +93,13 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
         }
         tableContents += '</thead>\n';
 
-        for (let i = 1; i < lines.length - 1; i++) {
+        tableContents += '<tr>';
+        for (let i = 0; i < doctorNames.length; i++) {
+            tableContents += `<td style="text-align:center;font-weight:bold;">${doctorNames[i]}</td>`
+        }
+        tableContents += '</tr>';
+
+        for (let i = 2; i < lines.length - 1; i++) {
             let fields = lines[i].split(',');
             tableContents += '<tr>';
 
