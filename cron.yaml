@@ -1,0 +1,4 @@
+cron:
+  - description: "Daily render cleanup"
+    url: /cleanUp
+    schedule: every 24 hours
