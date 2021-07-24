@@ -282,8 +282,7 @@ function checkUser(user, perms) {
 }
 
 app.post('/addCall', async (req, res) => {
-
-    let token = req.token;
+    let token = req.body.token;
     let body = req.body;
     let dID = body.dID;
     let date = body.date;
@@ -292,7 +291,7 @@ app.post('/addCall', async (req, res) => {
     let user;
 
     try {
-        let user = User.fromToken(token);
+        user = await User.fromToken(token);
         await checkUser(user, 30);
     } catch (e) {
         console.error(e);
@@ -310,6 +309,57 @@ app.post('/addCall', async (req, res) => {
         res.status(200).json({ status: "ok", message: "Added call", ack: { date, value, dID } });
     } catch (e) {
         res.status(500).json({status: "error", message: `Server error: ${e}`});
+    }
+});
+
+app.post('/getAllCalls', async (req, res) => {
+
+    let token = req.body.token;
+
+    let user;
+    try {
+        user = await User.fromToken(token);
+        await checkUser(user, 30);
+    } catch (e) {
+        console.error(e);
+        res.status(400).json({ status: "error", code: e.code, message: error_codes[e.code]});
+        return;
+    }
+
+    try {
+        let results = await sqlQuery("SELECT * FROM tblCalls;");
+        res.status(200).json({ status: "ok", message: `Fetched ${results.length} results.`, results })
+    } catch (e) {
+        res.status(500).json({ status: "error", code: 0, message: `Server error: ${e}` });
+    }
+
+});
+
+app.post('/deleteCall', async (req, res) => {
+
+    let token = req.body.token;
+    let id = req.body.id;
+
+    let user;
+    try {
+        user = User.fromToken(token);
+        await checkUser(user, 30);
+    } catch (e) {
+        console.error(e);
+        res.status(400).json({ status: "error", code: e.code, message: error_codes[e.code]});
+        return;
+    }
+
+    if (id === null) {
+        res.status(400).json({ status:"error", code: 1, message: error_codes[1] });
+        return;
+    }
+
+    try {
+        await sqlQuery("DELETE FROM tblCalls WHERE id = ?", [id]);
+        res.status(200).json({ status: "ok", message: `Deleted call (id: ${id})` });
+    } catch (e) {
+        res.status(500).json({ status: "error", code: 0, message: `Server error: ${e}` });
     }
 });
 
