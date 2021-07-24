@@ -265,6 +265,54 @@ app.get('/cleanUp', async (req, res) => {
 
 });
 
+function checkUser(user, perms) {
+    return new Promise(((resolve, reject) => {
+        if (!user) {
+            reject({code: 20});
+            return;
+        }
+
+        if (perms !== null && user.permissionLevel >= perms) {
+                reject({code: 1});
+                return;
+        }
+
+        resolve();
+    }));
+}
+
+app.post('/addCall', async (req, res) => {
+
+    let token = req.token;
+    let body = req.body;
+    let dID = body.dID;
+    let date = body.date;
+    let value = body.value;
+
+    let user;
+
+    try {
+        let user = User.fromToken(token);
+        await checkUser(user, 30);
+    } catch (e) {
+        console.error(e);
+        res.status(400).json({ status: "error", code: e.code, message: error_codes[e.code]});
+        return;
+    }
+
+    if (!date || !value) {
+        res.status(400).json({ status: "error", code: 11, message: error_codes[11] });
+        return;
+    }
+
+    try {
+        await sqlQuery("INSERT INTO tblCalls (date, value, dID) VALUES (?, ?, ?);", [date, value, dID]);
+        res.status(200).json({ status: "ok", message: "Added call", ack: { date, value, dID } });
+    } catch (e) {
+        res.status(500).json({status: "error", message: `Server error: ${e}`});
+    }
+});
+
 app.post('/getSharedModules', async (req, res) => {
 
     let body = req.body;

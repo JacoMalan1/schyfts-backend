@@ -70,6 +70,10 @@ User.fromCredentials = async function(uname, pword) {
 
 User.fromToken = async function(token) {
 
+    if (!token) {
+        throw { code: 20 };
+    }
+
     let uID_Q = await sqlQuery("SELECT uID FROM tblTokens WHERE token = ? AND expires > CURRENT_TIMESTAMP();", [token]);
 
     if (uID_Q.length !== 1) {
