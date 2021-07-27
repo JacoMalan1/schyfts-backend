@@ -113,7 +113,7 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
             tableContents += '</tr>\n';
         }
 
-        let doctors = await sqlQuery("SELECT * FROM tblDoctors ORDER BY surname");
+        let doctors = await sqlQuery("SELECT * FROM tblDoctors ORDER BY surname, name");
         let doctorTableData = '<tr>';
         let columns = 0;
         for (let d of doctors) {
@@ -121,11 +121,10 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
                 columns = 0;
                 doctorTableData += "</tr><tr>";
             }
-            doctorTableData += `<td>${d.surname}</td><td>${d.shortcode}</td>`;
+            doctorTableData += `<td>${d.surname}, ${d.name}</td><td>${d.shortcode}</td>`;
             columns++;
         }
         doctorTableData += '</tr>';
-
 
         res.render('index', {
             scheduleHeading: req.params.sr.replace(/\+/g, ' '),
