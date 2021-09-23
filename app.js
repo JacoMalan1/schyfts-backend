@@ -78,20 +78,44 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
         let header = lines[0].split(',');
         let doctorNames = lines[1].split(',');
 
-        tableContents += '<colgroup>'
-        for (let i = 0; i < header.length; i++) {
-            tableContents += '<col style="width:50px;">\n';
-        }
-        tableContents += '</colgroup>\n';
+        let seperators = [4, 8, 14];
 
         tableContents += '<thead>';
         for (let i = 0; i < header.length; i++) {
             if (header[i] === '')
                 continue;
             let span = (header[i + 1] === '') ? 2 : 1;
+
+            for (let j = 0; j < seperators.length; j++) {
+                if (seperators[j] === i) {
+                    if (span > 1) {
+                        seperators[j] += 1;
+                    }
+                }
+            }
+
             tableContents += `<th style="text-align:center;" colspan=${span}>${header[i]}</th>`;
         }
         tableContents += '</thead>\n';
+
+        let colgroup = '';
+        colgroup += '<colgroup>'
+        for (let i = 0; i < header.length; i++) {
+            let doSep = false;
+            for (let sep of seperators) {
+                if (sep === i) {
+                    doSep = true;
+                    break;
+                }
+            }
+            if (doSep)
+                colgroup += '<col style="width:50px;border-right:4px solid;">'
+            else
+                colgroup += '<col style="width:50px;">\n';
+        }
+        colgroup += '</colgroup>\n';
+
+        tableContents = colgroup + tableContents;
 
         tableContents += '<tr>';
         for (let i = 0; i < doctorNames.length; i++) {
@@ -101,6 +125,11 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
 
         for (let i = 2; i < lines.length - 1; i++) {
             let fields = lines[i].split(',');
+
+            // if (i - 2 === 3 || i - 2 === 6 || i - 2 === 11) {
+            //     tableContents += '<tr style="border-right: 4px solid white;">\n'
+            // } else {
+            // }
             tableContents += '<tr>';
 
             for (let f of fields) {
@@ -108,6 +137,7 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
                 let sub = (f[0] === '#') ? 1 : 0;
                 tableContents +=
                     `<td style="height:40px;background:${bg};">${f.substr(sub, 15)}</td>`;
+
             }
 
             tableContents += '</tr>\n';
