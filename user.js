@@ -16,7 +16,7 @@ class User {
 User.register = async function(uname, email, pword, perm) {
 
     let user_Q = await sqlQuery(
-        "SELECT uName, email FROM tblUsers WHERE uName = ? OR uEmail = ?;",
+        "SELECT uName, uEmail FROM tblUsers WHERE uName = ? OR uEmail = ?;",
         [uname, email]
     );
 
