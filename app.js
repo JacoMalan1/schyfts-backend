@@ -63,6 +63,55 @@ function min(x, y) {
     return (x > y) ? y : x;
 }
 
+app.post('/updateCallRegistry', async (req, res) => {
+    let body = req.body;
+    let token = body.token;
+    let dateStr = body.date;
+    let entries = body.entries;
+
+    if (!token || !dateStr || !entries) {
+        res.status(400).json({ status: "error", code: 11, message: error_codes[11] }).end();
+        return;
+    }
+
+    if (!token.match(TOKEN_FORMAT)) {
+        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        return;
+    }
+
+    let user = await User.fromToken(token);
+    if (!user) {
+        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        return;
+    }
+
+    if (user.perm > 9) {
+        res.status(200).json({ status: "error", code: 1, message: error_codes[1] }).end();
+        return;
+    }
+
+    let queryString = "INSERT INTO tblCalls (date, value, dID) VALUES ";
+    let params = [];
+    for (let entry of entries) {
+        let baseDate = new Date(dateStr);
+        baseDate.setDate(baseDate.getDate() + entry.dow);
+
+        for (let i = 0; i < entry.calls.length; i++) {
+            queryString += "(?, ?, ?), ";
+            params.push(baseDate.toISOString().split('T')[0], i + 1, entry.calls[i]);
+        }
+    }
+
+    queryString = queryString.substr(0, queryString.length - 2) + ';';
+
+    console.log(queryString);
+    console.log(params);
+
+    await sqlQuery(queryString, params);
+
+    res.json({ status: "ok", message: "Call registry updated" }).end();
+})
+
 app.get('/printOut/:id/:sr/:ws', async (req, res) => {
 
     let bucket = storage.bucket('nelanest-roster');
