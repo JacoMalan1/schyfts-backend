@@ -97,6 +97,8 @@ app.post('/updateCallRegistry', async (req, res) => {
         baseDate.setDate(baseDate.getDate() + entry.dow);
 
         for (let i = 0; i < entry.calls.length; i++) {
+            if (entry.calls[i] === 0)
+                continue;
             queryString += "(?, ?, ?), ";
             params.push(baseDate.toISOString().split('T')[0], i + 1, entry.calls[i]);
         }
