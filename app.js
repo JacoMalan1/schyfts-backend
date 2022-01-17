@@ -5,6 +5,8 @@ const bcrypt    = require('bcrypt');
 const fs        = require('fs');
 const mysql     = require('mysql');
 const User      = require('./user.js');
+const Statistic = require('./statistic.js');
+const strToIntArr = require('./util.js');
 const sqlQuery  = require('./sql.js');
 const {Storage} = require('@google-cloud/storage')
 // ============================ //
@@ -114,6 +116,134 @@ app.post('/updateCallRegistry', async (req, res) => {
     res.json({ status: "ok", message: "Call registry updated" }).end();
 })
 
+app.get('/statistics/:token/:sd/:ed', async (req, res) => {
+
+    let body = req.body;
+    let startDate = req.params.sd;
+    let endDate = req.params.ed;
+    let token = req.params.token;
+
+    if (!token || !startDate || !endDate) {
+        res.send("ERROR: Some parameters are missing!").end();
+        return;
+    }
+
+    if (!token.match(TOKEN_FORMAT)) {
+        res.send("ERROR: Invalid token format!").end();
+        return;
+    }
+
+    let user = await User.fromToken(token);
+    if (!user) {
+        res.send("ERROR: Invalid or expired token!").end();
+        return;
+    }
+
+    let historicalStats = await sqlQuery("SELECT * FROM tblOldStats;");
+    let callData = await sqlQuery("SELECT * FROM tblCalls WHERE date >= ? AND date <= ?;", [startDate, endDate]);
+    let doctors = await sqlQuery("SELECT * FROM tblDoctors ORDER BY surname, name;");
+    let holidays = await sqlQuery("SELECT * FROM tblHolidays WHERE date >= ? AND date <= ?;", [startDate, endDate]);
+
+    let statistics = {};
+    for (let i = 0; i < doctors.length; i++) {
+        let found = false;
+        let stat;
+
+        for (let hs of historicalStats) {
+            if (hs.dID === doctors[i].id) {
+                found = true;
+                stat = new Statistic();
+                stat.weekdayCalls = strToIntArr(hs.weekdayCalls);
+                stat.weekendCalls = strToIntArr(hs.weekendCalls);
+                stat.christmasCalls = strToIntArr(hs.christmasCalls);
+                stat.newYearCalls = strToIntArr(hs.newYearCalls);
+                stat.holidayCalls = strToIntArr(hs.holidayCalls);
+                stat.easterCalls = strToIntArr(hs.easterCalls);
+            }
+        }
+
+        if (!found)
+            statistics[doctors[i].id.toString()] = new Statistic();
+        else
+            statistics[doctors[i].id.toString()] = stat;
+    }
+
+    for (let cd of callData) {
+        let date = new Date(cd.date);
+        if (date.getMonth() === 11 && (date.getDate() === 25 || date.getDate() === 26)) {
+            statistics[cd.dID.toString()].addChristmasCall(cd.value);
+        } else if (date.getMonth() === 0 && date.getDate() === 1) {
+            statistics[cd.dID.toString()].addNewYearCall(cd.value);
+        } else {
+            let isHoliday = false;
+            let isEaster = false;
+            for (let h of holidays) {
+                let hDate = new Date(h.date);
+                if (hDate.toISOString() === date.toISOString()) {
+                    if (h.name.toLowerCase().includes("easter"))
+                        isEaster = true;
+                    else
+                        isHoliday = true;
+                    break;
+                }
+            }
+            if (isHoliday)
+                statistics[cd.dID.toString()].addHolidayCall(cd.value);
+            else if (isEaster) {
+                statistics[cd.dID.toString()].addEasterCall(cd.value);
+            }
+            else {
+                if (date.getDay() === 6) {
+                    statistics[cd.dID.toString()].addWeekendCall(cd.value);
+                } else {
+                    statistics[cd.dID.toString()].addWeekdayCall(cd.value);
+                }
+            }
+        }
+    }
+
+    let totals = new Statistic();
+    let averages = new Statistic();
+
+    for (let d of doctors) {
+        for (let i = 0; i < 3; i++) {
+            totals.weekdayCalls[i] += statistics[d.id.toString()].weekdayCalls[i];
+            averages.weekdayCalls[i] += statistics[d.id.toString()].weekdayCalls[i];
+        }
+        for (let i = 0; i < 3; i++) {
+            totals.weekendCalls[i] += statistics[d.id.toString()].weekendCalls[i];
+            averages.weekendCalls[i] += statistics[d.id.toString()].weekendCalls[i];
+        }
+        for (let i = 0; i < 3; i++) {
+            totals.holidayCalls[i] += statistics[d.id.toString()].holidayCalls[i];
+            averages.holidayCalls[i] += statistics[d.id.toString()].holidayCalls[i];
+        }
+    }
+
+    for (let i = 0; i < 3; i++)
+        averages.weekdayCalls[i] /= doctors.length - 1;
+    for (let i = 0; i < 3; i++)
+        averages.weekendCalls[i] /= doctors.length - 1;
+    for (let i = 0; i < 3; i++)
+        averages.holidayCalls[i] /= doctors.length - 1;
+
+    let tableContents = '';
+    tableContents += Statistic.getTableHeader();
+    for (let d of doctors) {
+        let doctorName = `${d.name} ${d.surname}`;
+        tableContents += statistics[d.id.toString()].getTableRow(doctorName);
+    }
+
+    tableContents += totals.getTotalRow();
+    tableContents += averages.getAverageRow();
+
+    res.render('statistics', {
+        pageTitle: `Statistics from ${startDate} to ${endDate}`,
+        statsFrom: `Call statistics from ${startDate} to ${endDate}`,
+        tableData: tableContents
+    });
+});
+
 app.get('/printOut/:id/:sr/:ws', async (req, res) => {
 
     let bucket = storage.bucket('nelanest-roster');
@@ -207,7 +337,7 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
         }
         doctorTableData += '</tr>';
 
-        res.render('index', {
+        res.render('printOut', {
             scheduleHeading: req.params.sr.replace(/\+/g, ' '),
             weekStarting: 'Week starting: ' + decodeURIComponent(req.params.ws),
             pageTitle: 'Schyfts Renderer',
