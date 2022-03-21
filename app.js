@@ -8,12 +8,22 @@ const User      = require('./user.js');
 const Statistic = require('./statistic.js');
 const strToIntArr = require('./util.js');
 const sqlQuery  = require('./sql.js');
-const {Storage} = require('@google-cloud/storage')
+const {Storage} = require('@google-cloud/storage');
+const RateLimit = require('epxress-rate-limit');
 // ============================ //
 
 require('dotenv').config();
 
 const app = express();
+
+// Implement rate-limiting to protect against DoS attacks.
+// Allow a maximum of five requests per minut
+let limiter = new RateLimit({
+    windowMs: 60000, // 1 minute
+    max: 5
+});
+app.use(limiter);
+
 const saltRounds = 10;
 
 const SQL_HOST = process.env.SQL_HOST;
@@ -94,26 +104,27 @@ app.post('/updateCallRegistry', async (req, res) => {
 
     let queryString = "INSERT INTO tblCalls (date, value, dID) VALUES ";
     let params = [];
-    for (let entry of entries) {
-        let baseDate = new Date(dateStr);
-        baseDate.setDate(baseDate.getDate() + entry.dow);
 
-        for (let i = 0; i < entry.calls.length; i++) {
-            if (entry.calls[i] === 0)
-                continue;
-            queryString += "(?, ?, ?), ";
-            params.push(baseDate.toISOString().split('T')[0], i + 1, entry.calls[i]);
+    if (entries.length !== null && entries.length < 10e4) {
+        for (let entry of entries) {
+            let baseDate = new Date(dateStr);
+            baseDate.setDate(baseDate.getDate() + entry.dow);
+
+            for (let i = 0; i < entry.calls.length; i++) {
+                if (entry.calls[i] === 0)
+                    continue;
+                queryString += "(?, ?, ?), ";
+                params.push(baseDate.toISOString().split('T')[0], i + 1, entry.calls[i]);
+            }
         }
+        queryString = queryString.substr(0, queryString.length - 2) + ';';
+        console.log(queryString);
+        console.log(params);
+        await sqlQuery(queryString, params);
+        res.json({status: "ok", message: "Call registry updated"}).end();
+    } else {
+        req.status(200).json({stats: "error", message: "Illegal parameter"}).end();
     }
-
-    queryString = queryString.substr(0, queryString.length - 2) + ';';
-
-    console.log(queryString);
-    console.log(params);
-
-    await sqlQuery(queryString, params);
-
-    res.json({ status: "ok", message: "Call registry updated" }).end();
 })
 
 app.get('/statistics/:token/:sd/:ed', async (req, res) => {
@@ -187,13 +198,13 @@ app.get('/statistics/:token/:sd/:ed', async (req, res) => {
                     break;
                 }
             }
-            if (isHoliday)
+            if (isHoliday && date.getDay() > 0 && date.getDay() < 6)
                 statistics[cd.dID.toString()].addHolidayCall(cd.value);
             else if (isEaster) {
                 statistics[cd.dID.toString()].addEasterCall(cd.value);
             }
             else {
-                if (date.getDay() === 6) {
+                if (date.getDay() in [ 0, 6 ]) {
                     statistics[cd.dID.toString()].addWeekendCall(cd.value);
                 } else {
                     statistics[cd.dID.toString()].addWeekdayCall(cd.value);

@@ -10,6 +10,7 @@ class Statistic {
 
     addEasterCall(value) {
         this.easterCalls[value - 1]++;
+        this.addHolidayCall(value);
     }
 
     addWeekdayCall(value) {
@@ -22,10 +23,12 @@ class Statistic {
 
     addChristmasCall(value) {
         this.christmasCalls[value - 1]++;
+        this.addHolidayCall(value);
     }
 
     addNewYearCall(value) {
         this.newYearCalls[value - 1]++;
+        this.addHolidayCall(value);
     }
 
     addHolidayCall(value) {
