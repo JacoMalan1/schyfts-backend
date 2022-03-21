@@ -9,7 +9,7 @@ const Statistic = require('./statistic.js');
 const strToIntArr = require('./util.js');
 const sqlQuery  = require('./sql.js');
 const {Storage} = require('@google-cloud/storage');
-const RateLimit = require('epxress-rate-limit');
+const RateLimit = require('express-rate-limit');
 // ============================ //
 
 require('dotenv').config();
@@ -18,7 +18,7 @@ const app = express();
 
 // Implement rate-limiting to protect against DoS attacks.
 // Allow a maximum of five requests per minut
-let limiter = new RateLimit({
+const limiter = RateLimit({
     windowMs: 60000, // 1 minute
     max: 5
 });
