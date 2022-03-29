@@ -20,7 +20,7 @@ const app = express();
 // Allow a maximum of five requests per minut
 const limiter = RateLimit({
     windowMs: 60000, // 1 minute
-    max: 5
+    max: 60
 });
 app.use(limiter);
 
