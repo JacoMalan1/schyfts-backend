@@ -270,7 +270,7 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
         let header = lines[0].split(',');
         let doctorNames = lines[1].split(',');
 
-        let seperators = [4, 8, 13];
+        let seperators = [4, 8, 13, 17, 20];
 
         tableContents += '<thead>';
         for (let i = 0; i < header.length; i++) {
