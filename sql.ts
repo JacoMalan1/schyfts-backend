@@ -1,7 +1,7 @@
-const mysql = require('mysql');
-const fs = require('fs');
+import * as mysql from 'mysql'
+import * as fs from 'fs'
 
-function sqlQuery(query, f) {
+export function sqlQuery(query: string, f?: Array<any>): Promise<any[]> {
 
     let SQL_HOST = process.env.SQL_HOST;
     let SQL_USER = process.env.SQL_USER;
@@ -46,5 +46,3 @@ function sqlQuery(query, f) {
 
     }
 }
-
-module.exports = sqlQuery;

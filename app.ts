@@ -1,16 +1,14 @@
-// ========= MODULES ========== //
-const uuid      = require('uuid');
-const express   = require('express');
-const bcrypt    = require('bcrypt');
-const fs        = require('fs');
-const mysql     = require('mysql');
-const User      = require('./user.js');
-const Statistic = require('./statistic.js');
-const strToIntArr = require('./util.js');
-const sqlQuery  = require('./sql.js');
-const {Storage} = require('@google-cloud/storage');
-const RateLimit = require('express-rate-limit');
-// ============================ //
+import * as uuid from "uuid";
+import * as express from "express";
+import * as bcrypt from "bcrypt";
+import * as fs from "fs";
+import * as mysql from "mysql";
+import { User } from "./user";
+import { Statistic } from "./statistic";
+import { strToIntArr } from "./util";
+import { sqlQuery } from "./sql";
+import { Storage } from "@google-cloud/storage";
+import RateLimit from "express-rate-limit";
 
 require('dotenv').config();
 
@@ -71,10 +69,6 @@ app.use(express.json());
 app.set('views', './views');
 app.set('view engine', 'ejs')
 
-function min(x, y) {
-    return (x > y) ? y : x;
-}
-
 app.post('/updateCallRegistry', async (req, res) => {
     let body = req.body;
     let token = body.token;
@@ -123,13 +117,11 @@ app.post('/updateCallRegistry', async (req, res) => {
         await sqlQuery(queryString, params);
         res.json({status: "ok", message: "Call registry updated"}).end();
     } else {
-        req.status(200).json({stats: "error", message: "Illegal parameter"}).end();
+        res.status(200).json({stats: "error", message: "Illegal parameter"}).end();
     }
 })
 
 app.get('/statistics/:token/:sd/:ed', async (req, res) => {
-
-    let body = req.body;
     let startDate = req.params.sd;
     let endDate = req.params.ed;
     let token = req.params.token;
@@ -158,7 +150,7 @@ app.get('/statistics/:token/:sd/:ed', async (req, res) => {
     let statistics = {};
     for (let i = 0; i < doctors.length; i++) {
         let found = false;
-        let stat;
+        let stat = new Statistic();
 
         for (let hs of historicalStats) {
             if (hs.dID === doctors[i].id) {
@@ -173,10 +165,7 @@ app.get('/statistics/:token/:sd/:ed', async (req, res) => {
             }
         }
 
-        if (!found)
-            statistics[doctors[i].id.toString()] = new Statistic();
-        else
-            statistics[doctors[i].id.toString()] = stat;
+        statistics[doctors[i].id.toString()] = stat;
     }
 
     for (let cd of callData) {
@@ -465,12 +454,12 @@ app.get('/cleanUp', async (req, res) => {
     let bucket = storage.bucket('nelanest-roster');
     bucket.getFiles({ prefix: 'render_tmp' })
     .then(files => {
-        files = files[0];
+        let toDelete = files[0];
         for (let i = 0; i < files.length; i++) {
-            console.log(`Deleting file ${files[i].name}...`);
-            files[i].delete().catch(err => console.log(err));
+            console.log(`Deleting file ${toDelete[i].name}...`);
+            toDelete[i].delete().catch(err => console.log(err));
         }
-        res.status(200).json({ status: "ok", message: `Deleted ${files.length} files from "render_tmp/"` });
+        res.status(200).json({ status: "ok", message: `Deleted ${toDelete.length} files from "render_tmp/"` });
     }).catch(err => {
         res.status(500).json({ status: "error", message: "An unknown error has occurred" });
         console.error(err);
@@ -486,19 +475,19 @@ app.get('/cleanUp', async (req, res) => {
 
 });
 
-function checkUser(user, perms) {
-    return new Promise(((resolve, reject) => {
+function checkUser(user, perms): Promise<boolean> {
+    return new Promise(((resolve) => {
         if (!user) {
-            reject({code: 20});
+            resolve(false);
             return;
         }
 
         if (perms !== null && user.permissionLevel >= perms) {
-                reject({code: 1});
+                resolve(false);
                 return;
         }
 
-        resolve();
+        resolve(true);
     }));
 }
 
@@ -1226,7 +1215,7 @@ app.post('/login', (req, res) => {
         } else {
 
             if (!(results[0].uHash && results[0].uID)) {
-                res.status(200).body({status: "error", code: 23, message: error_codes[23]}).end();
+                res.status(200).json({status: "error", code: 23, message: error_codes[23]}).end();
                 return;
             }
 

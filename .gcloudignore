@@ -18,3 +18,5 @@ node_modules/
 
 # Mysql connection script
 sqlConnect
+
+build/

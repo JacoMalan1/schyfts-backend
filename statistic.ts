@@ -1,4 +1,11 @@
-class Statistic {
+export class Statistic {
+    public weekdayCalls: number[];
+    public weekendCalls: number[];
+    public christmasCalls: number[];
+    public newYearCalls: number[];
+    public holidayCalls: number[];
+    public easterCalls: number[];
+
     constructor() {
         this.weekdayCalls = [0, 0, 0];
         this.weekendCalls = [0, 0, 0];
@@ -111,5 +118,3 @@ class Statistic {
         return result;
     }
 }
-
-module.exports = Statistic
