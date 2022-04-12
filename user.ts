@@ -3,6 +3,7 @@ import * as bcrypt from 'bcrypt';
 import * as uuid from 'uuid';
 
 export const saltRounds = 10;
+export const TOKEN_FORMAT = /^\w{8}-\w{4}-\w{4}-\w{4}-\w{12}$/g;
 
 export class User {
     public id: number;
@@ -53,8 +54,8 @@ export class User {
     }
 
     static async fromToken(token: string): Promise<User> {
-        if (!token) {
-            throw { code: 20 }
+        if (!token || !token.match(TOKEN_FORMAT)) {
+            throw {message: "Invalid Token"}
         }
 
         let uID_Q = await sqlQuery("SELECT uID FROM tblTokens WHERE token = ? AND expires > CURRENT_TIMESTAMP();", [token]);

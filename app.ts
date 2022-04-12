@@ -9,6 +9,7 @@ import { strToIntArr } from "./util";
 import { sqlQuery } from "./sql";
 import { Storage } from "@google-cloud/storage";
 import RateLimit from "express-rate-limit";
+import {APIResponse} from "./APIResponse";
 
 require('dotenv').config();
 
@@ -40,8 +41,6 @@ const sqlConnection = mysql.createConnection({
         key: fs.readFileSync('client-key.pem')
     }
 });
-
-const TOKEN_FORMAT = /^\w{8}-\w{4}-\w{4}-\w{4}-\w{12}$/g;
 
 const error_codes = {
     0: 'Undefined error',
@@ -76,23 +75,18 @@ app.post('/updateCallRegistry', async (req, res) => {
     let entries = body.entries;
 
     if (!token || !dateStr || !entries) {
-        res.status(400).json({ status: "error", code: 11, message: error_codes[11] }).end();
-        return;
-    }
-
-    if (!token.match(TOKEN_FORMAT)) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        res.json(new APIResponse(false, "Missing variables")).end();
         return;
     }
 
     let user = await User.fromToken(token);
     if (!user) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
 
     if (user.perm > 9) {
-        res.status(200).json({ status: "error", code: 1, message: error_codes[1] }).end();
+        res.json(new APIResponse(false, "Insufficient permissions")).end();
         return;
     }
 
@@ -115,9 +109,9 @@ app.post('/updateCallRegistry', async (req, res) => {
         console.log(queryString);
         console.log(params);
         await sqlQuery(queryString, params);
-        res.json({status: "ok", message: "Call registry updated"}).end();
+        res.json(new APIResponse(true, "Call registry updated")).end();
     } else {
-        res.status(200).json({stats: "error", message: "Illegal parameter"}).end();
+        res.json(new APIResponse(false, "Illegal parameter/s")).end();
     }
 })
 
@@ -128,11 +122,6 @@ app.get('/statistics/:token/:sd/:ed', async (req, res) => {
 
     if (!token || !startDate || !endDate) {
         res.send("ERROR: Some parameters are missing!").end();
-        return;
-    }
-
-    if (!token.match(TOKEN_FORMAT)) {
-        res.send("ERROR: Invalid token format!").end();
         return;
     }
 
@@ -356,23 +345,18 @@ app.post('/deleteSurgeonLeave', async (req, res) => {
     let startDate = body.startDate;
 
     if (!token || !surname || !startDate) {
-        res.status(400).json({ status: "error", code: 11, message: error_codes[11] }).end();
-        return;
-    }
-
-    if (!token.match(TOKEN_FORMAT)) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        res.json({ status: "error", code: 11, message: error_codes[11] }).end();
         return;
     }
 
     let user = await User.fromToken(token);
     if (!user) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        res.json({ status: "error", code: 25, message: error_codes[25] }).end();
         return;
     }
 
     if (user.perm > 29) {
-        res.status(200).json({ status: "error", code: 1, message: error_codes[1] }).end();
+        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
         return;
     }
 
@@ -381,7 +365,7 @@ app.post('/deleteSurgeonLeave', async (req, res) => {
     } catch (e) {
         res.status(500).json({ status: "error", message: e }).end();
     }
-    res.status(200).json({ status: "ok", message: "Surgeon leave removed" }).end();
+    res.json({ status: "ok", message: "Surgeon leave removed" }).end();
 });
 
 app.post('/addSurgeonLeave', async (req, res) => {
@@ -394,30 +378,25 @@ app.post('/addSurgeonLeave', async (req, res) => {
     let endDate = body.endDate;
 
     if (!token || !name || !surname || !startDate || !endDate) {
-        res.status(400).json({ status: "error", code: 11, message: error_codes[11] }).end();
-        return;
-    }
-
-    if (!token.match(TOKEN_FORMAT)) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        res.json({ status: "error", code: 11, message: error_codes[11] }).end();
         return;
     }
 
     let user = await User.fromToken(token);
     if (!user) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        res.json({ status: "error", code: 25, message: error_codes[25] }).end();
         return;
     }
 
     if (user.perm > 29) {
-        res.status(200).json({ status: "error", code: 1, message: error_codes[1] }).end();
+        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
         return;
     }
 
     try {
         await sqlQuery("INSERT INTO tblSurgeonLeave (name, surname, start, end) VALUES (?, ?, ?, ?);",
             [name, surname, startDate, endDate]);
-        res.status(200).json({ status: "ok", message: "Surgeon leave added" }).end();
+        res.json({ status: "ok", message: "Surgeon leave added" }).end();
     } catch (e) {
         res.status(500).json({ status: "error", message: e }).end();
     }
@@ -430,23 +409,18 @@ app.post('/getAllSurgeonLeave', async (req, res) => {
     let token = body.token;
 
     if (!token) {
-        res.status(400).json({ status: "error", code: 11, message: error_codes[11] }).end();
-        return;
-    }
-
-    if (!token.match(TOKEN_FORMAT)) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        res.json({ status: "error", code: 11, message: error_codes[11] }).end();
         return;
     }
 
     let user = await User.fromToken(token);
     if (!user) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        res.json({ status: "error", code: 25, message: error_codes[25] }).end();
         return;
     }
 
     if (user.perm > 30) {
-        res.status(200).json({ status: "error", code: 1, message: error_codes[1] }).end();
+        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
         return;
     }
 
@@ -459,7 +433,7 @@ app.get('/cleanUp', async (req, res) => {
             console.log(`Deleting file ${toDelete[i].name}...`);
             toDelete[i].delete().catch(err => console.log(err));
         }
-        res.status(200).json({ status: "ok", message: `Deleted ${toDelete.length} files from "render_tmp/"` });
+        res.json({ status: "ok", message: `Deleted ${toDelete.length} files from "render_tmp/"` });
     }).catch(err => {
         res.status(500).json({ status: "error", message: "An unknown error has occurred" });
         console.error(err);
@@ -468,7 +442,7 @@ app.get('/cleanUp', async (req, res) => {
 
     try {
         let results = await sqlQuery("SELECT * FROM tblSurgeonLeave;");
-        res.status(200).json({ status: "ok", results }).end();
+        res.json({ status: "ok", results }).end();
     } catch (e) {
         res.status(500).json({ status: "error", message: e }).end();
     }
@@ -505,18 +479,18 @@ app.post('/addCall', async (req, res) => {
         await checkUser(user, 30);
     } catch (e) {
         console.error(e);
-        res.status(400).json({ status: "error", code: e.code, message: error_codes[e.code]});
+        res.json({ status: "error", code: e.code, message: error_codes[e.code]});
         return;
     }
 
     if (!date || !value) {
-        res.status(400).json({ status: "error", code: 11, message: error_codes[11] });
+        res.json({ status: "error", code: 11, message: error_codes[11] });
         return;
     }
 
     try {
         await sqlQuery("INSERT INTO tblCalls (date, value, dID) VALUES (?, ?, ?);", [date, value, dID]);
-        res.status(200).json({ status: "ok", message: "Added call", ack: { date, value, dID } });
+        res.json({ status: "ok", message: "Added call", ack: { date, value, dID } });
     } catch (e) {
         res.status(500).json({status: "error", message: `Server error: ${e}`});
     }
@@ -532,13 +506,13 @@ app.post('/getAllCalls', async (req, res) => {
         await checkUser(user, 30);
     } catch (e) {
         console.error(e);
-        res.status(400).json({ status: "error", code: e.code, message: error_codes[e.code]});
+        res.json({ status: "error", code: e.code, message: error_codes[e.code]});
         return;
     }
 
     try {
         let results = await sqlQuery("SELECT * FROM tblCalls;");
-        res.status(200).json({ status: "ok", message: `Fetched ${results.length} results.`, results })
+        res.json({ status: "ok", message: `Fetched ${results.length} results.`, results })
     } catch (e) {
         res.status(500).json({ status: "error", code: 0, message: `Server error: ${e}` });
     }
@@ -556,18 +530,18 @@ app.post('/deleteCall', async (req, res) => {
         await checkUser(user, 30);
     } catch (e) {
         console.error(e);
-        res.status(400).json({ status: "error", code: e.code, message: error_codes[e.code]});
+        res.json({ status: "error", code: e.code, message: error_codes[e.code]});
         return;
     }
 
     if (id === null) {
-        res.status(400).json({ status:"error", code: 1, message: error_codes[1] });
+        res.json({ status:"error", code: 1, message: error_codes[1] });
         return;
     }
 
     try {
         await sqlQuery("DELETE FROM tblCalls WHERE id = ?", [id]);
-        res.status(200).json({ status: "ok", message: `Deleted call (id: ${id})` });
+        res.json({ status: "ok", message: `Deleted call (id: ${id})` });
     } catch (e) {
         res.status(500).json({ status: "error", code: 0, message: `Server error: ${e}` });
     }
@@ -579,29 +553,24 @@ app.post('/getSharedModules', async (req, res) => {
     let token = body.token;
 
     if (!token) {
-        res.status(400).json({ status: "error", code: 11, message: error_codes[11] }).end();
-        return;
-    }
-
-    if (!token.match(TOKEN_FORMAT)) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        res.json({ status: "error", code: 11, message: error_codes[11] }).end();
         return;
     }
 
     let user = await User.fromToken(token);
     if (!user) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        res.json({ status: "error", code: 25, message: error_codes[25] }).end();
         return;
     }
 
     if (user.perm > 19) {
-        res.status(200).json({ status: "error", code: 1, message: error_codes[1] }).end();
+        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
         return;
     }
 
     try {
         let results = await sqlQuery("SELECT * FROM tblSharedModules;");
-        res.status(200).json({ status: "ok", message: `Got ${results.length} shared modules`, results }).end();
+        res.json({ status: "ok", message: `Got ${results.length} shared modules`, results }).end();
     } catch (e) {
         res.status(500).json({ status: "error", message: `Internal server error (${JSON.stringify(e)})` }).end();
     }
@@ -616,23 +585,18 @@ app.post('/editDoctor', async (req, res) => {
     let edit = body.edit;
 
     if (!token || !id || !edit) {
-        res.status(400).json({ status: "error", code: 11, message: error_codes[11] }).end();
-        return;
-    }
-
-    if (!token.match(TOKEN_FORMAT)) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        res.json({ status: "error", code: 11, message: error_codes[11] }).end();
         return;
     }
 
     let user = await User.fromToken(token);
     if (!user) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        res.json({ status: "error", code: 25, message: error_codes[25] }).end();
         return;
     }
 
     if (user.perm > 28) {
-        res.status(200).json({ status: "error", code: 1, message: error_codes[1] }).end();
+        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
         return;
     }
 
@@ -660,7 +624,7 @@ app.post('/editDoctor', async (req, res) => {
     sqlString += " WHERE id = ?;";
     params.push(id);
     await sqlQuery(sqlString, params);
-    res.status(200).json({ status: "ok", message: "Doctor record updated", ack: { edit } }).end();
+    res.json({ status: "ok", message: "Doctor record updated", ack: { edit } }).end();
 
 });
 
@@ -671,28 +635,23 @@ app.post('/deleteDoctor', async (req, res) => {
     let id = body.id;
 
     if (!token || !id) {
-        res.status(400).json({ status: "error", code: 11, message: error_codes[11] });
-        return;
-    }
-
-    if (!token.match(TOKEN_FORMAT)) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({ status: "error", code: 11, message: error_codes[11] });
         return;
     }
 
     let user = await User.fromToken(token);
     if (!user) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({ status: "error", code: 25, message: error_codes[25]}).end();
         return;
     }
 
     if (user.perm > 26) {
-        res.status(200).json({ status: "error", code: 1, message: error_codes[1] }).end();
+        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
         return;
     }
 
     await sqlQuery("DELETE FROM tblDoctors WHERE id = ?", [id]);
-    res.status(200).json({ status: "ok", message: `Delete doctor (id: ${id})` });
+    res.json({ status: "ok", message: `Delete doctor (id: ${id})` });
 
 });
 
@@ -706,35 +665,30 @@ app.post('/addDoctor', async (req, res) => {
     let surname = body.surname;
 
     if (!token || !shortcode || !cellphone || !name || !surname) {
-        res.status(400).json({ status: "error", code: 11, message: error_codes[11] });
-        return;
-    }
-
-    if (!token.match(TOKEN_FORMAT)) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({ status: "error", code: 11, message: error_codes[11] });
         return;
     }
 
     let user = await User.fromToken(token);
     if (!user) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({ status: "error", code: 25, message: error_codes[25]}).end();
         return;
     }
 
     if (user.perm > 27) {
-        res.status(200).json({ status: "error", code: 1, message: error_codes[1] }).end();
+        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
         return;
     }
 
     let shortcodeFormat = /^\*\d{5}$/;
     if (!shortcode.match(shortcodeFormat)) {
-        res.status(400).json({ status: "error", code: 41 , message: error_codes[41] }).end();
+        res.json({ status: "error", code: 41 , message: error_codes[41] }).end();
         return;
     }
 
     let cellFormat = /^\d{10}$/;
     if (!cellphone.match(cellFormat)) {
-        res.status(400).json({ status: "error", code: 42, message: error_codes[42] }).end();
+        res.json({ status: "error", code: 42, message: error_codes[42] }).end();
         return;
     }
 
@@ -743,7 +697,7 @@ app.post('/addDoctor', async (req, res) => {
         [shortcode, cellphone, name, surname]
     );
 
-    res.status(200).json({
+    res.json({
         status: "ok",
         message: "Doctor added",
         ack: {
@@ -761,28 +715,23 @@ app.post('/getAllDoctors', async (req, res) => {
     let body = req.body;
     let token = body.token;
     if (!token) {
-        res.status(400).json({ status: "error", code: 11, message: error_codes[11] });
-        return;
-    }
-
-    if (!token.match(TOKEN_FORMAT)) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({ status: "error", code: 11, message: error_codes[11] });
         return;
     }
 
     let user = await User.fromToken(token);
     if (!user) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({ status: "error", code: 25, message: error_codes[25]}).end();
         return;
     }
 
     if (user.perm > 29) {
-        res.status(200).json({ status: "error", code: 1, message: error_codes[1] }).end();
+        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
         return;
     }
 
     let doctors_Q = await sqlQuery("SELECT * FROM tblDoctors;");
-    res.status(200)
+    res
         .json({ status: "ok", message: `${doctors_Q.length} results`, results: doctors_Q }).end();
 
 });
@@ -796,28 +745,23 @@ app.post('/addLeave', async (req, res) => {
     let token = body.token;
 
     if (!token || !dID || !startDate || !endDate) {
-        res.status(400).json({ status: "error", code: 11, message: error_codes[11] }).end();
-        return;
-    }
-
-    if (!token.match(TOKEN_FORMAT)) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({ status: "error", code: 11, message: error_codes[11] }).end();
         return;
     }
 
     let user = await User.fromToken(token);
     if (!user) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({ status: "error", code: 25, message: error_codes[25]}).end();
         return;
     }
 
     if (user.perm > 29) {
-        res.status(200).json({ status: "error", code: 1, message: error_codes[1] });
+        res.json({ status: "error", code: 1, message: error_codes[1] });
         return;
     }
 
     await sqlQuery("INSERT INTO tblLeave (dID, start, end) VALUES (?, ?, ?);", [dID, startDate, endDate]);
-    res.status(200).json({ status: "ok", message: "Added leave", ack: { id: dID, startDate, endDate } });
+    res.json({ status: "ok", message: "Added leave", ack: { id: dID, startDate, endDate } });
 
 });
 
@@ -827,23 +771,18 @@ app.post('/getAllLeave', async (req, res) => {
     let token = body.token;
 
     if (!token) {
-        res.status(400).json({ status: "error", code: 11, message: error_codes[11] });
-        return;
-    }
-
-    if (!token.match(TOKEN_FORMAT)) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({ status: "error", code: 11, message: error_codes[11] });
         return;
     }
 
     let user = await User.fromToken(token);
     if (!user) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({ status: "error", code: 25, message: error_codes[25]}).end();
         return;
     }
 
     if (user.perm > 29) {
-        res.status(200).json({ status: "error", code: 1, message: error_codes[1] }).end();
+        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
         return;
     }
 
@@ -863,7 +802,7 @@ app.post('/getAllLeave', async (req, res) => {
         return;
     }
 
-    res.status(200).json({ status: "ok", results });
+    res.json({ status: "ok", results });
 
 });
 
@@ -876,23 +815,18 @@ app.post('/editLeave', async (req, res) => {
     let edit = body.edit;
 
     if (!token) {
-        res.status(400).json({ status: "error", code: 11, message: error_codes[11] });
-        return;
-    }
-
-    if (!token.match(TOKEN_FORMAT)) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({ status: "error", code: 11, message: error_codes[11] });
         return;
     }
 
     let user = await User.fromToken(token);
     if (!user) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({ status: "error", code: 25, message: error_codes[25]}).end();
         return;
     }
 
     if (user.perm > 29) {
-        res.status(200).json({ status: "error", code: 1, message: error_codes[1] }).end();
+        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
         return;
     }
 
@@ -923,7 +857,7 @@ app.post('/editLeave', async (req, res) => {
         return;
     }
 
-    res.status(200).json({ status: "ok", message: "Edit successfull", ack: edit }).end();
+    res.json({ status: "ok", message: "Edit successfull", ack: edit }).end();
 
 });
 
@@ -935,23 +869,18 @@ app.post('/deleteLeave', async (req, res) => {
     let startDate = body.startDate;
 
     if (!token) {
-        res.status(400).json({ status: "error", code: 11, message: error_codes[11] });
-        return;
-    }
-
-    if (!token.match(TOKEN_FORMAT)) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({ status: "error", code: 11, message: error_codes[11] });
         return;
     }
 
     let user = await User.fromToken(token);
     if (!user) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({ status: "error", code: 25, message: error_codes[25]}).end();
         return;
     }
 
     if (user.perm > 27) {
-        res.status(200).json({ status: "error", code: 1, message: error_codes[1] }).end();
+        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
         return;
     }
 
@@ -962,7 +891,7 @@ app.post('/deleteLeave', async (req, res) => {
         return;
     }
 
-    res.status(200).json({ status: "ok", message: `Deleted leave starting at ${startDate} for dID: ${dID}` }).end();
+    res.json({ status: "ok", message: `Deleted leave starting at ${startDate} for dID: ${dID}` }).end();
 
 });
 
@@ -973,28 +902,23 @@ app.post('/getLeave', async (req, res) => {
     let token = body.token;
 
     if (!token || !dID) {
-        res.status(400).json({ status: "error", code: 11, message: error_codes[11] }).end();
-        return;
-    }
-
-    if (!token.match(TOKEN_FORMAT)) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({ status: "error", code: 11, message: error_codes[11] }).end();
         return;
     }
 
     let user = await User.fromToken(token);
     if (!user) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({ status: "error", code: 25, message: error_codes[25]}).end();
         return;
     }
 
     if (user.perm > 29) {
-        res.status(200).json({ status: "error", code: 1, message: error_codes[1] });
+        res.json({ status: "error", code: 1, message: error_codes[1] });
         return;
     }
 
     let results = await sqlQuery("SELECT * FROM tblLeave WHERE dID = ?", [dID]);
-    res.status(200).json({ status: "ok", message: `${results.length} results found`, results }).end();
+    res.json({ status: "ok", message: `${results.length} results found`, results }).end();
 
 });
 
@@ -1005,12 +929,7 @@ app.post('/getDoctor', async (req, res) => {
     let token = body.token;
 
     if (token === undefined || surname === undefined || token.length <= 0 || surname .length <= 0) {
-        res.status(400).json({ status: "error", code: 11, message: error_codes[11] }).end();
-        return;
-    }
-
-    if (!token.match(TOKEN_FORMAT)) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25] }).end();
+        res.json({ status: "error", code: 11, message: error_codes[11] }).end();
         return;
     }
 
@@ -1027,7 +946,7 @@ app.post('/getDoctor', async (req, res) => {
         let uID = results[0].uID;
         results = await sqlQuery("SELECT uPerm FROM tblUsers WHERE uID = ?;", [uID]);
         if (results[0].uPerm > 19) {
-            res.status(400).json({status: "error", code: 1, message: error_codes[1]}).end();
+            res.json({status: "error", code: 1, message: error_codes[1]}).end();
             return;
         }
 
@@ -1035,7 +954,7 @@ app.post('/getDoctor', async (req, res) => {
         res.json({ status: "ok", message: `${results.length} results found`, results }).end();
 
     } else {
-        res.status(200).json({ status: "error", code: 25,message: error_codes[25] }).end();
+        res.json({ status: "error", code: 25,message: error_codes[25] }).end();
     }
 
 });
@@ -1046,30 +965,25 @@ app.post('/getAllUsers', async (req, res) => {
     let token = body.token;
 
     if (!token) {
-        res.status(400).json({ status: "error", code: 11, message: error_codes[11] }).end();
-        return;
-    }
-
-    if (!token.match(TOKEN_FORMAT)) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({ status: "error", code: 11, message: error_codes[11] }).end();
         return;
     }
 
     let user = await User.fromToken(token);
     if (!user) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({ status: "error", code: 25, message: error_codes[25]}).end();
         return;
     }
 
     if (user.perm > 10) {
-        res.status(200).json({ status: "error", code: 1, message: error_codes[1] });
+        res.json({ status: "error", code: 1, message: error_codes[1] });
         return;
     }
 
     try {
 
         let results = await sqlQuery("SELECT uID, uName, uEmail, uPerm FROM tblUsers;");
-        res.status(200).json({ status: "ok", message: `Got ${results.length} results`, results });
+        res.json({ status: "ok", message: `Got ${results.length} results`, results });
 
     } catch (e) {
         res.status(500).json({ status: "error", message: `Internal server error: ${JSON.stringify(e)}`}).end();
@@ -1083,25 +997,20 @@ app.post('/getSetting', async (req, res) => {
     let key = body.key;
 
     if (!token || !key) {
-        res.status(400).json({status: "error", code: 11, message: error_codes[11]}).end();
-        return;
-    }
-
-    if (!token.match(TOKEN_FORMAT)) {
-        res.status(400).json({status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({status: "error", code: 11, message: error_codes[11]}).end();
         return;
     }
 
     let user = await User.fromToken(token);
     if (!user) {
-        res.status(400).json({status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({status: "error", code: 25, message: error_codes[25]}).end();
         return;
     }
 
     try {
         let result = await sqlQuery("SELECT * FROM tblOptions WHERE key_string = ?", [key]);
         result = result[0];
-        res.status(200).json({ status: "ok", message: "Fetched setting value", result }).end();
+        res.json({ status: "ok", message: "Fetched setting value", result }).end();
     } catch (e) {
         res.status(500).json({ status: "error", message: `Internal server error: ${JSON.stringify(e)}` }).end();
     }
@@ -1115,18 +1024,13 @@ app.post('/setSetting', async (req, res) => {
     let value = body.value;
 
     if (!token || key === undefined || value === undefined) {
-        res.status(400).json({status: "error", code: 11, message: error_codes[11]}).end();
-        return;
-    }
-
-    if (!token.match(TOKEN_FORMAT)) {
-        res.status(400).json({status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({status: "error", code: 11, message: error_codes[11]}).end();
         return;
     }
 
     let user = await User.fromToken(token);
     if (!user) {
-        res.status(400).json({status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({status: "error", code: 25, message: error_codes[25]}).end();
         return;
     }
 
@@ -1134,10 +1038,10 @@ app.post('/setSetting', async (req, res) => {
         let result = await sqlQuery("SELECT * FROM tblOptions WHERE key_string = ?", [key]);
         if (result.length !== 0) {
             await sqlQuery("UPDATE tblOptions SET `value` = ? WHERE key_string = ?", [value, key]);
-            res.status(200).json({ status: "ok", message: "Setting updated", ack: { key_string: key, value } });
+            res.json({ status: "ok", message: "Setting updated", ack: { key_string: key, value } });
         } else {
-            await sqlQuery("INSERT INTO tblOptions (key_string, `value`) VALUES (?, ?)", [key, value]);            res.status(200).json({ status: "ok", message: "Setting updated", ack: { key, value } });
-            res.status(200).json({ status: "ok", message: "Setting created", ack: { key_string: key, value } });
+            await sqlQuery("INSERT INTO tblOptions (key_string, `value`) VALUES (?, ?)", [key, value]);            res.json({ status: "ok", message: "Setting updated", ack: { key, value } });
+            res.json({ status: "ok", message: "Setting created", ack: { key_string: key, value } });
         }
     } catch (e) {
         res.status(500).json({ status: "error", message: `Internal server error: ${JSON.stringify(e)}` });
@@ -1153,23 +1057,18 @@ app.post('/editUser', async (req, res) => {
     let edit = body.edit;
 
     if (!token || !uID || !edit) {
-        res.status(400).json({ status: "error", code: 11, message: error_codes[11] }).end();
-        return;
-    }
-
-    if (!token.match(TOKEN_FORMAT)) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({ status: "error", code: 11, message: error_codes[11] }).end();
         return;
     }
 
     let user = await User.fromToken(token);
     if (!user) {
-        res.status(400).json({ status: "error", code: 25, message: error_codes[25]}).end();
+        res.json({ status: "error", code: 25, message: error_codes[25]}).end();
         return;
     }
 
     if (user.perm > 9) {
-        res.status(200).json({ status: "error", code: 1, message: error_codes[1] });
+        res.json({ status: "error", code: 1, message: error_codes[1] });
         return;
     }
 
@@ -1190,7 +1089,7 @@ app.post('/editUser', async (req, res) => {
 
     try {
         await sqlQuery(sqlString, params);
-        res.status(200).json({ status: "ok", message: `User (id: ${uID}) edited`, ack: edit }).end();
+        res.json({ status: "ok", message: `User (id: ${uID}) edited`, ack: edit }).end();
     } catch (e) {
         res.status(500).json({ status: "error", message: `Internal server error: ${JSON.stringify(e)}` });
     }
@@ -1201,7 +1100,7 @@ app.post('/login', (req, res) => {
 
     let body = req.body;
     if (!body.uname || !body.pword) {
-        res.status(400)
+        res
             .json({status: "error", code: 11, message: "Missing arguments 'uname' or 'pword'"}).end();
         return;
     }
@@ -1215,7 +1114,7 @@ app.post('/login', (req, res) => {
         } else {
 
             if (!(results[0].uHash && results[0].uID)) {
-                res.status(200).json({status: "error", code: 23, message: error_codes[23]}).end();
+                res.json({status: "error", code: 23, message: error_codes[23]}).end();
                 return;
             }
 
