@@ -1,4 +1,3 @@
-import * as uuid from "uuid";
 import * as express from "express";
 import * as bcrypt from "bcrypt";
 import * as fs from "fs";
@@ -16,7 +15,7 @@ require('dotenv').config();
 const app = express();
 
 // Implement rate-limiting to protect against DoS attacks.
-// Allow a maximum of five requests per minut
+// Allow a maximum of five requests per minute
 const limiter = RateLimit({
     windowMs: 60000, // 1 minute
     max: 60
@@ -79,14 +78,8 @@ app.post('/updateCallRegistry', async (req, res) => {
         return;
     }
 
-    let user = await User.fromToken(token);
-    if (!user) {
+    if (!await User.checkAuth(token, 9)) {
         res.json(new APIResponse(false, "Authentication failure")).end();
-        return;
-    }
-
-    if (user.perm > 9) {
-        res.json(new APIResponse(false, "Insufficient permissions")).end();
         return;
     }
 
@@ -125,9 +118,8 @@ app.get('/statistics/:token/:sd/:ed', async (req, res) => {
         return;
     }
 
-    let user = await User.fromToken(token);
-    if (!user) {
-        res.send("ERROR: Invalid or expired token!").end();
+    if (!await User.checkAuth(token, 30)) {
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
 
@@ -234,6 +226,13 @@ app.get('/statistics/:token/:sd/:ed', async (req, res) => {
 });
 
 app.get('/printOut/:id/:sr/:ws', async (req, res) => {
+    let id = req.params.id;
+    let sr = req.params.sr;
+    let ws = req.params.ws;
+
+    if (!id || !sr || !ws) {
+        res.send("ERROR: Missing parameters!");
+    }
 
     let bucket = storage.bucket('nelanest-roster');
     let file = bucket.file(`render_tmp/${req.params.id}.scsv`);
@@ -248,18 +247,19 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
         let header = lines[0].split(',');
         let doctorNames = lines[1].split(',');
 
-        let seperators = [4, 8, 13, 17, 20];
+        let separators = [0, 4, 8, 13, 17, 20];
 
         tableContents += '<thead>';
         for (let i = 0; i < header.length; i++) {
             if (header[i] === '')
                 continue;
+
             let span = (header[i + 1] === '') ? 2 : 1;
 
-            for (let j = 0; j < seperators.length; j++) {
-                if (seperators[j] === i) {
+            for (let j = 0; j < separators.length; j++) {
+                if (separators[j] === i) {
                     if (span > 1) {
-                        seperators[j] += 1;
+                        separators[j] += 1;
                     }
                 }
             }
@@ -272,7 +272,7 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
         colgroup += '<colgroup>'
         for (let i = 0; i < header.length; i++) {
             let doSep = false;
-            for (let sep of seperators) {
+            for (let sep of separators) {
                 if (sep === i) {
                     doSep = true;
                     break;
@@ -333,9 +333,7 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
             tableData: tableContents,
             doctorInfo: doctorTableData
         });
-
     });
-
 });
 
 app.post('/deleteSurgeonLeave', async (req, res) => {
@@ -349,14 +347,8 @@ app.post('/deleteSurgeonLeave', async (req, res) => {
         return;
     }
 
-    let user = await User.fromToken(token);
-    if (!user) {
-        res.json({ status: "error", code: 25, message: error_codes[25] }).end();
-        return;
-    }
-
-    if (user.perm > 29) {
-        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
+    if (!await User.checkAuth(token, 29)) {
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
 
@@ -369,7 +361,6 @@ app.post('/deleteSurgeonLeave', async (req, res) => {
 });
 
 app.post('/addSurgeonLeave', async (req, res) => {
-
     let body = req.body;
     let token = body.token;
     let name = body.name;
@@ -382,14 +373,8 @@ app.post('/addSurgeonLeave', async (req, res) => {
         return;
     }
 
-    let user = await User.fromToken(token);
-    if (!user) {
-        res.json({ status: "error", code: 25, message: error_codes[25] }).end();
-        return;
-    }
-
-    if (user.perm > 29) {
-        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
+    if (!await User.checkAuth(token, 29)) {
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
 
@@ -400,11 +385,9 @@ app.post('/addSurgeonLeave', async (req, res) => {
     } catch (e) {
         res.status(500).json({ status: "error", message: e }).end();
     }
-
 });
 
 app.post('/getAllSurgeonLeave', async (req, res) => {
-
     let body = req.body;
     let token = body.token;
 
@@ -413,32 +396,10 @@ app.post('/getAllSurgeonLeave', async (req, res) => {
         return;
     }
 
-    let user = await User.fromToken(token);
-    if (!user) {
-        res.json({ status: "error", code: 25, message: error_codes[25] }).end();
+    if (!await User.checkAuth(token, 30)) {
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
-
-    if (user.perm > 30) {
-        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
-        return;
-    }
-
-app.get('/cleanUp', async (req, res) => {
-    let bucket = storage.bucket('nelanest-roster');
-    bucket.getFiles({ prefix: 'render_tmp' })
-    .then(files => {
-        let toDelete = files[0];
-        for (let i = 0; i < files.length; i++) {
-            console.log(`Deleting file ${toDelete[i].name}...`);
-            toDelete[i].delete().catch(err => console.log(err));
-        }
-        res.json({ status: "ok", message: `Deleted ${toDelete.length} files from "render_tmp/"` });
-    }).catch(err => {
-        res.status(500).json({ status: "error", message: "An unknown error has occurred" });
-        console.error(err);
-    });
-});
 
     try {
         let results = await sqlQuery("SELECT * FROM tblSurgeonLeave;");
@@ -446,7 +407,22 @@ app.get('/cleanUp', async (req, res) => {
     } catch (e) {
         res.status(500).json({ status: "error", message: e }).end();
     }
+});
 
+app.get('/cleanUp', async (req, res) => {
+    let bucket = storage.bucket('nelanest-roster');
+    bucket.getFiles({ prefix: 'render_tmp' })
+        .then(files => {
+            let toDelete = files[0];
+            for (let i = 0; i < files.length; i++) {
+                console.log(`Deleting file ${toDelete[i].name}...`);
+                toDelete[i].delete().catch(err => console.log(err));
+            }
+            res.json({ status: "ok", message: `Deleted ${toDelete.length} files from "render_tmp/"` });
+        }).catch(err => {
+        res.status(500).json({ status: "error", message: "An unknown error has occurred" });
+        console.error(err);
+    });
 });
 
 function checkUser(user, perms): Promise<boolean> {
@@ -472,19 +448,13 @@ app.post('/addCall', async (req, res) => {
     let date = body.date;
     let value = body.value;
 
-    let user;
-
-    try {
-        user = await User.fromToken(token);
-        await checkUser(user, 30);
-    } catch (e) {
-        console.error(e);
-        res.json({ status: "error", code: e.code, message: error_codes[e.code]});
+    if (!date || !value || !token || !dID) {
+        res.json({ status: "error", code: 11, message: error_codes[11] });
         return;
     }
 
-    if (!date || !value) {
-        res.json({ status: "error", code: 11, message: error_codes[11] });
+    if (!await User.checkAuth(token, 30)) {
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
 
@@ -497,16 +467,15 @@ app.post('/addCall', async (req, res) => {
 });
 
 app.post('/getAllCalls', async (req, res) => {
-
     let token = req.body.token;
 
-    let user;
-    try {
-        user = await User.fromToken(token);
-        await checkUser(user, 30);
-    } catch (e) {
-        console.error(e);
-        res.json({ status: "error", code: e.code, message: error_codes[e.code]});
+    if (!token) {
+        res.json(new APIResponse(false, "Missing parameters"));
+        return;
+    }
+
+    if (!await User.checkAuth(token, 30)) {
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
 
@@ -516,26 +485,19 @@ app.post('/getAllCalls', async (req, res) => {
     } catch (e) {
         res.status(500).json({ status: "error", code: 0, message: `Server error: ${e}` });
     }
-
 });
 
 app.post('/deleteCall', async (req, res) => {
-
     let token = req.body.token;
     let id = req.body.id;
 
-    let user;
-    try {
-        user = User.fromToken(token);
-        await checkUser(user, 30);
-    } catch (e) {
-        console.error(e);
-        res.json({ status: "error", code: e.code, message: error_codes[e.code]});
+    if (!id || !token) {
+        res.json({ status:"error", code: 1, message: error_codes[1] });
         return;
     }
 
-    if (id === null) {
-        res.json({ status:"error", code: 1, message: error_codes[1] });
+    if (!await User.checkAuth(token, 30)) {
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
 
@@ -548,7 +510,6 @@ app.post('/deleteCall', async (req, res) => {
 });
 
 app.post('/getSharedModules', async (req, res) => {
-
     let body = req.body;
     let token = body.token;
 
@@ -557,14 +518,8 @@ app.post('/getSharedModules', async (req, res) => {
         return;
     }
 
-    let user = await User.fromToken(token);
-    if (!user) {
-        res.json({ status: "error", code: 25, message: error_codes[25] }).end();
-        return;
-    }
-
-    if (user.perm > 19) {
-        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
+    if (!await User.checkAuth(token, 30)) {
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
 
@@ -574,11 +529,9 @@ app.post('/getSharedModules', async (req, res) => {
     } catch (e) {
         res.status(500).json({ status: "error", message: `Internal server error (${JSON.stringify(e)})` }).end();
     }
-
 });
 
 app.post('/editDoctor', async (req, res) => {
-
     let body = req.body;
     let token = body.token;
     let id = body.id;
@@ -589,14 +542,8 @@ app.post('/editDoctor', async (req, res) => {
         return;
     }
 
-    let user = await User.fromToken(token);
-    if (!user) {
-        res.json({ status: "error", code: 25, message: error_codes[25] }).end();
-        return;
-    }
-
-    if (user.perm > 28) {
-        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
+    if (!await User.checkAuth(token, 28)) {
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
 
@@ -625,11 +572,9 @@ app.post('/editDoctor', async (req, res) => {
     params.push(id);
     await sqlQuery(sqlString, params);
     res.json({ status: "ok", message: "Doctor record updated", ack: { edit } }).end();
-
 });
 
 app.post('/deleteDoctor', async (req, res) => {
-
     let body = req.body;
     let token = body.token;
     let id = body.id;
@@ -639,24 +584,16 @@ app.post('/deleteDoctor', async (req, res) => {
         return;
     }
 
-    let user = await User.fromToken(token);
-    if (!user) {
-        res.json({ status: "error", code: 25, message: error_codes[25]}).end();
-        return;
-    }
-
-    if (user.perm > 26) {
-        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
+    if (!await User.checkAuth(token, 26)) {
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
 
     await sqlQuery("DELETE FROM tblDoctors WHERE id = ?", [id]);
     res.json({ status: "ok", message: `Delete doctor (id: ${id})` });
-
 });
 
 app.post('/addDoctor', async (req, res) => {
-
     let body = req.body;
     let token = body.token;
     let shortcode = body.shortcode;
@@ -669,14 +606,8 @@ app.post('/addDoctor', async (req, res) => {
         return;
     }
 
-    let user = await User.fromToken(token);
-    if (!user) {
-        res.json({ status: "error", code: 25, message: error_codes[25]}).end();
-        return;
-    }
-
-    if (user.perm > 27) {
-        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
+    if (!await User.checkAuth(token, 27)) {
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
 
@@ -711,29 +642,23 @@ app.post('/addDoctor', async (req, res) => {
 });
 
 app.post('/getAllDoctors', async (req, res) => {
-
-    let body = req.body;
-    let token = body.token;
+    let token = req.body.token;
     if (!token) {
-        res.json({ status: "error", code: 11, message: error_codes[11] });
+        res.json(new APIResponse(false, "Missing parameters"));
         return;
     }
 
-    let user = await User.fromToken(token);
-    if (!user) {
-        res.json({ status: "error", code: 25, message: error_codes[25]}).end();
+    if (!await User.checkAuth(token, 29)) {
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
 
-    if (user.perm > 29) {
-        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
-        return;
+    try {
+        let doctors_Q = await sqlQuery("SELECT * FROM tblDoctors;");
+        res.json(new APIResponse(true, `${doctors_Q.length} results`, { results: doctors_Q }));
+    } catch (e) {
+        res.json(new APIResponse(false, "An unknown server error occurred"));
     }
-
-    let doctors_Q = await sqlQuery("SELECT * FROM tblDoctors;");
-    res
-        .json({ status: "ok", message: `${doctors_Q.length} results`, results: doctors_Q }).end();
-
 });
 
 app.post('/addLeave', async (req, res) => {
@@ -745,18 +670,12 @@ app.post('/addLeave', async (req, res) => {
     let token = body.token;
 
     if (!token || !dID || !startDate || !endDate) {
-        res.json({ status: "error", code: 11, message: error_codes[11] }).end();
+        res.json(new APIResponse(false, "Missing parameters"));
         return;
     }
 
-    let user = await User.fromToken(token);
-    if (!user) {
-        res.json({ status: "error", code: 25, message: error_codes[25]}).end();
-        return;
-    }
-
-    if (user.perm > 29) {
-        res.json({ status: "error", code: 1, message: error_codes[1] });
+    if (!await User.checkAuth(token, 29)) {
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
 
@@ -771,18 +690,12 @@ app.post('/getAllLeave', async (req, res) => {
     let token = body.token;
 
     if (!token) {
-        res.json({ status: "error", code: 11, message: error_codes[11] });
+        res.json(new APIResponse(false, "Missing parameters"));
         return;
     }
 
-    let user = await User.fromToken(token);
-    if (!user) {
-        res.json({ status: "error", code: 25, message: error_codes[25]}).end();
-        return;
-    }
-
-    if (user.perm > 29) {
-        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
+    if (!await User.checkAuth(token, 29)) {
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
 
@@ -815,18 +728,12 @@ app.post('/editLeave', async (req, res) => {
     let edit = body.edit;
 
     if (!token) {
-        res.json({ status: "error", code: 11, message: error_codes[11] });
+        res.json(new APIResponse(false, "Missing parameters"));
         return;
     }
 
-    let user = await User.fromToken(token);
-    if (!user) {
-        res.json({ status: "error", code: 25, message: error_codes[25]}).end();
-        return;
-    }
-
-    if (user.perm > 29) {
-        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
+    if (!await User.checkAuth(token, 29)) {
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
 
@@ -862,37 +769,27 @@ app.post('/editLeave', async (req, res) => {
 });
 
 app.post('/deleteLeave', async (req, res) => {
-
     let body = req.body;
     let token = body.token;
     let dID = body.dID;
     let startDate = body.startDate;
 
     if (!token) {
-        res.json({ status: "error", code: 11, message: error_codes[11] });
+        res.json(new APIResponse(false, "Missing parameters"));
         return;
     }
 
-    let user = await User.fromToken(token);
-    if (!user) {
-        res.json({ status: "error", code: 25, message: error_codes[25]}).end();
-        return;
-    }
-
-    if (user.perm > 27) {
-        res.json({ status: "error", code: 1, message: error_codes[1] }).end();
+    if (!await User.checkAuth(token, 27)) {
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
 
     try {
         await sqlQuery("DELETE FROM tblLeave WHERE dID = ? AND DATE(start) = DATE(?);", [dID, startDate]);
+        res.json(new APIResponse(true, `Deleted leave starting at ${startDate} for dID: ${dID}`));
     } catch (e) {
         res.status(500).json({ status: "error", message: `SQL Query failed with: (${e})` }).end();
-        return;
     }
-
-    res.json({ status: "ok", message: `Deleted leave starting at ${startDate} for dID: ${dID}` }).end();
-
 });
 
 app.post('/getLeave', async (req, res) => {
@@ -906,30 +803,32 @@ app.post('/getLeave', async (req, res) => {
         return;
     }
 
-    let user = await User.fromToken(token);
-    if (!user) {
-        res.json({ status: "error", code: 25, message: error_codes[25]}).end();
+    if (!await User.checkAuth(token, 29)) {
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
 
-    if (user.perm > 29) {
-        res.json({ status: "error", code: 1, message: error_codes[1] });
-        return;
+    try {
+        let results = await sqlQuery("SELECT * FROM tblLeave WHERE dID = ?", [dID]);
+        res.json(new APIResponse(true, `${results.length} results found`, { results })).end();
+    } catch (e) {
+        res.json(new APIResponse(false, "An unknown server error occurred"));
     }
-
-    let results = await sqlQuery("SELECT * FROM tblLeave WHERE dID = ?", [dID]);
-    res.json({ status: "ok", message: `${results.length} results found`, results }).end();
 
 });
 
 app.post('/getDoctor', async (req, res) => {
-
     let body = req.body;
     let surname = body.surname;
     let token = body.token;
 
     if (token === undefined || surname === undefined || token.length <= 0 || surname .length <= 0) {
         res.json({ status: "error", code: 11, message: error_codes[11] }).end();
+        return;
+    }
+
+    if (!await User.checkAuth(token, 30)) {
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
 
@@ -960,61 +859,56 @@ app.post('/getDoctor', async (req, res) => {
 });
 
 app.post('/getAllUsers', async (req, res) => {
-
-    let body = req.body;
-    let token = body.token;
-
+    let token = req.body.token;
     if (!token) {
-        res.json({ status: "error", code: 11, message: error_codes[11] }).end();
+        res.json(new APIResponse(false, "Missing parameters"));
         return;
     }
 
-    let user = await User.fromToken(token);
-    if (!user) {
-        res.json({ status: "error", code: 25, message: error_codes[25]}).end();
-        return;
-    }
-
-    if (user.perm > 10) {
-        res.json({ status: "error", code: 1, message: error_codes[1] });
+    if (!await User.checkAuth(token, 10)) {
+        res.json(new APIResponse(false, "Authentication failure"));
         return;
     }
 
     try {
-
         let results = await sqlQuery("SELECT uID, uName, uEmail, uPerm FROM tblUsers;");
-        res.json({ status: "ok", message: `Got ${results.length} results`, results });
-
+        if (results.length === 0) {
+            res.json(new APIResponse(false, "The query returned no results. The user database appears to be empty."));
+            return;
+        }
+        res.json(new APIResponse(true, `Got ${results.length} results`, { results }))
     } catch (e) {
-        res.status(500).json({ status: "error", message: `Internal server error: ${JSON.stringify(e)}`}).end();
+        res.json(new APIResponse(false, "An unknown server error has occurred"));
     }
-
 });
 
 app.post('/getSetting', async (req, res) => {
-    let body = req.body;
-    let token = body.token;
-    let key = body.key;
+    let token = req.body.token;
+    let key = req.body.key;
 
     if (!token || !key) {
-        res.json({status: "error", code: 11, message: error_codes[11]}).end();
+        res.json(new APIResponse(false, "Missing parameters"));
         return;
     }
 
-    let user = await User.fromToken(token);
-    if (!user) {
-        res.json({status: "error", code: 25, message: error_codes[25]}).end();
+    if (!await User.checkAuth(token, 30)) {
+        res.json(new APIResponse(false, "Authentication failure"));
         return;
     }
 
     try {
-        let result = await sqlQuery("SELECT * FROM tblOptions WHERE key_string = ?", [key]);
-        result = result[0];
-        res.json({ status: "ok", message: "Fetched setting value", result }).end();
-    } catch (e) {
-        res.status(500).json({ status: "error", message: `Internal server error: ${JSON.stringify(e)}` }).end();
-    }
+        let valueQuery = await sqlQuery("SELECT key_string, value FROM tblOptions WHERE key_string = ?", [key]);
+        if (valueQuery.length !== 1) {
+            res.json(new APIResponse(false, "No such key!"));
+            return;
+        }
 
+        let value = valueQuery[0].value;
+        let key_string = valueQuery[0].key_string;
+        res.json(new APIResponse(true, "Fetched setting value", { result: { key_string, value } }));
+    } catch (e) {
+        res.json(new APIResponse(false, "An unknown error has occurred"));
+    }
 });
 
 app.post('/setSetting', async (req, res) => {
@@ -1028,9 +922,8 @@ app.post('/setSetting', async (req, res) => {
         return;
     }
 
-    let user = await User.fromToken(token);
-    if (!user) {
-        res.json({status: "error", code: 25, message: error_codes[25]}).end();
+    if (!await User.checkAuth(token, 30)) {
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
 
@@ -1061,14 +954,8 @@ app.post('/editUser', async (req, res) => {
         return;
     }
 
-    let user = await User.fromToken(token);
-    if (!user) {
-        res.json({ status: "error", code: 25, message: error_codes[25]}).end();
-        return;
-    }
-
-    if (user.perm > 9) {
-        res.json({ status: "error", code: 1, message: error_codes[1] });
+    if (!await User.checkAuth(token, 9)) {
+        res.json(new APIResponse(false, "Authentication failure")).end();
         return;
     }
 
@@ -1096,51 +983,37 @@ app.post('/editUser', async (req, res) => {
 
 });
 
-app.post('/login', (req, res) => {
+app.post('/login', async (req, res) => {
+    let uname = req.body.uname;
+    let pword = req.body.pword;
 
-    let body = req.body;
-    if (!body.uname || !body.pword) {
-        res
-            .json({status: "error", code: 11, message: "Missing arguments 'uname' or 'pword'"}).end();
+    if (!uname || !pword) {
+        res.json(new APIResponse(false, "Missing parameters!"));
         return;
     }
 
-    let pword = body.pword;
-    let uname = body.uname;
+    let userInfo = await sqlQuery("SELECT uID, uName, uHash, uPerm FROM tblUsers WHERE uName = ?", [uname]);
+    if (userInfo.length !== 1) {
+        res.json(new APIResponse(false, "No such user"));
+        return;
+    }
 
-    sqlConnection.query('SELECT uID, uPerm, uHash FROM tblUsers WHERE uName = ?', [uname], (err, results) => {
-        if (err) {
-            res.json({ status: 'error', code: 21, message: error_codes[21] }).end();
+    let dbHash = userInfo[0].uHash;
+    let id = userInfo[0].uID;
+    let permissionLevel = userInfo[0].uPerm;
+    try {
+        let same = await bcrypt.compare(pword, dbHash);
+        if (same) {
+            let user = new User(id, permissionLevel);
+            let token = await user.makeToken(10);
+            res.json(new APIResponse(true, "Logged in", { token, permissionLevel: userInfo[0].uPerm}));
         } else {
-
-            if (!(results[0].uHash && results[0].uID)) {
-                res.json({status: "error", code: 23, message: error_codes[23]}).end();
-                return;
-            }
-
-            let hash = results[0].uHash;
-            let uID = results[0].uID;
-            let uPerm = results[0].uPerm;
-            bcrypt.compare(pword, hash, (error, same) => {
-                if (same) {
-                    console.log(`Successful login (${uname})`);
-
-                    let token = uuid.v4();
-                    console.log(`Generated token ${token} for user ${uname}`);
-                    sqlConnection.query(
-                        `INSERT INTO tblTokens (token, uID, expires) VALUES (?, ${uID}, TIMESTAMP(now() + INTERVAL 10 HOUR));`,
-                        [token],
-                        err => { if (err) console.error(err); }
-                    );
-
-                    res.json({ status: 'ok', message: 'Logged in', token, permissionLevel: uPerm }).end();
-                } else {
-                    console.log(`Login failed (${uname})`);
-                    res.json({ status: 'error', code: 22, message: error_codes[22] }).end();
-                }
-            });
+            console.log(`Authentication failure for user id ${id}`);
+            res.json(new APIResponse(false, "Incorrect password"));
         }
-    });
+    } catch (e) {
+        res.json(new APIResponse(false, "An unknown error has occurred!"));
+    }
 
 });
 
