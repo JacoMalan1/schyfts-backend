@@ -5,7 +5,7 @@ import * as mysql from "mysql";
 import { User } from "./user";
 import { Statistic } from "./statistic";
 import { strToIntArr } from "./util";
-import { sqlQuery } from "./sql";
+import {sqlCommit, sqlQuery, sqlRollback, sqlStartTransaction} from "./sql";
 import { Storage } from "@google-cloud/storage";
 import RateLimit from "express-rate-limit";
 import {APIResponse} from "./APIResponse";
@@ -97,6 +97,11 @@ app.post('/updateCallRegistry', async (req, res) => {
     let dateStr = body.date;
     let entries = body.entries;
 
+    let SQL_HOST = process.env.SQL_HOST;
+    let SQL_USER = process.env.SQL_USER;
+    let SQL_PASS = process.env.SQL_PASS;
+    let SQL_DB = process.env.SQL_DB;
+
     if (!token || !dateStr || !entries) {
         res.json(new APIResponse(false, "Missing variables")).end();
         return;
@@ -107,28 +112,77 @@ app.post('/updateCallRegistry', async (req, res) => {
         return;
     }
 
+    let sqlConnection = mysql.createConnection({
+        host: `${SQL_HOST}`,
+        user: `${SQL_USER}`,
+        password: `${SQL_PASS}`,
+        database: `${SQL_DB}`,
+        ssl: {
+            ca: fs.readFileSync('server-ca.pem'),
+            cert: fs.readFileSync('client-cert.pem'),
+            key: fs.readFileSync('client-key.pem')
+        }
+    });
+
+    // Clear the database for this week before we insert the data
+    try {
+        let baseDate = new Date(dateStr);
+        let baseDateStr = baseDate.toISOString().split('T')[0];
+        await sqlStartTransaction(sqlConnection);
+        console.log("START TRANSACTION");
+        await sqlQuery(
+            "DELETE FROM tblCalls WHERE date >= ? AND date < ? + INTERVAL 7 DAY;",
+            [baseDateStr, baseDateStr], sqlConnection
+        );
+        console.log("DELETE");
+    } catch (e) {
+        console.log(e);
+        res.json(new APIResponse(false, "Unknown server error occurred"));
+        await sqlRollback(sqlConnection);
+        console.log("ROLLBACK");
+        return;
+    }
+
     let queryString = "INSERT INTO tblCalls (date, value, dID) VALUES ";
     let params = [];
 
-    if (entries.length !== null && entries.length < 10e4) {
-        for (let entry of entries) {
-            let baseDate = new Date(dateStr);
-            baseDate.setDate(baseDate.getDate() + entry.dow);
+    try {
+        if (entries.length !== null && entries.length === 7) {
+            for (let entry of entries) {
+                let baseDate = new Date(dateStr);
+                if (!Number.isInteger(entry.dow)) {
+                    await sqlRollback(sqlConnection);
+                    console.log("ROLLBACK");
+                    res.json(new APIResponse(false, "dow must be an integer"));
+                    return;
+                }
+                baseDate.setDate(baseDate.getDate() + entry.dow);
 
-            for (let i = 0; i < entry.calls.length; i++) {
-                if (entry.calls[i] === 0)
-                    continue;
-                queryString += "(?, ?, ?), ";
-                params.push(baseDate.toISOString().split('T')[0], i + 1, entry.calls[i]);
+                for (let i = 0; i < entry.calls.length; i++) {
+                    if (entry.calls[i] === 0)
+                        continue;
+                    queryString += "(?, ?, ?), ";
+                    params.push(baseDate.toISOString().split('T')[0], i + 1, entry.calls[i]);
+                }
             }
+            queryString = queryString.substr(0, queryString.length - 2) + ';';
+            console.log(queryString);
+            console.log(params);
+            await sqlQuery(queryString, params, sqlConnection);
+            console.log("QUERY");
+            await sqlCommit(sqlConnection);
+            console.log("COMMIT");
+            res.json(new APIResponse(true, "Call registry updated")).end();
+        } else {
+            await sqlRollback(sqlConnection)
+            console.log("ROLLBACK;");
+            res.json(new APIResponse(false, "Illegal parameter/s")).end();
         }
-        queryString = queryString.substr(0, queryString.length - 2) + ';';
-        console.log(queryString);
-        console.log(params);
-        await sqlQuery(queryString, params);
-        res.json(new APIResponse(true, "Call registry updated")).end();
-    } else {
-        res.json(new APIResponse(false, "Illegal parameter/s")).end();
+    } catch (e) {
+        console.log(e);
+        await sqlRollback(sqlConnection);
+        console.log("ROLLBACK;");
+        res.json(new APIResponse(false, "Unknown server error occurred"));
     }
 })
 
