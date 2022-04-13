@@ -367,7 +367,7 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
 
         tableContents += '<tr>';
         for (let i = 0; i < doctorNames.length; i++) {
-            tableContents += `<td style="text-align:center;font-weight:bold;">${doctorNames[i]}</td>`
+            tableContents += `<td style="text-align:center;font-weight:bold;border-bottom: 4px solid;">${doctorNames[i]}</td>`;
         }
         tableContents += '</tr>';
 
@@ -383,8 +383,10 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
             for (let f of fields) {
                 let bg = (f[0] === '#') ? "#4ca644" : "white";
                 let sub = (f[0] === '#') ? 1 : 0;
-                tableContents +=
-                    `<td style="height:40px;background:${bg};">${f.substr(sub, 15)}</td>`;
+                if ((i - 1) % 2 == 0)
+                    tableContents += `<td style="height:40px;background:${bg};border-bottom: 4px solid;">${f.substr(sub, 15)}</td>`;
+                else
+                    tableContents += `<td style="height:40px;background:${bg};">${f.substr(sub, 15)}</td>`;
 
             }
 
