@@ -67,6 +67,30 @@ app.use(express.json());
 app.set('views', './views');
 app.set('view engine', 'ejs')
 
+app.post('/getCallData', async (req, res) => {
+   let token = req.body.token;
+   let startDate = req.body.start;
+   let endDate = req.body.end;
+
+   if (!token || !startDate || !endDate) {
+       res.json(new APIResponse(false, "Missing parameters"));
+       return;
+   }
+
+   if (!await User.checkAuth(token, 10)) {
+       res.json(new APIResponse(false, "Authentication failure"));
+       return;
+   }
+
+   try {
+       let results = await sqlQuery("SELECT date, dID, value FROM tblCalls WHERE date >= ? AND date <= ?",
+           [startDate, endDate]);
+       res.json(new APIResponse(true, `Got ${results.length} results`, { results }));
+   } catch (e) {
+       res.json(new APIResponse(false, "An unknown server error occurred"));
+   }
+});
+
 app.post('/updateCallRegistry', async (req, res) => {
     let body = req.body;
     let token = body.token;
