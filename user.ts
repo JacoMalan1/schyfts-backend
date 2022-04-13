@@ -24,17 +24,19 @@ export class User {
         let token = uuid.v4();
 
         await sqlQuery(
-            "INSERT INTO tblTokens (token, expires) VALUES (?, TIMESTAMP(now() + INTERVAL ? HOUR));",
-            [token, hours]
+            "INSERT INTO tblTokens (uID, token, expires) VALUES (?, ?, TIMESTAMP(now() + INTERVAL ? HOUR));",
+            [this.id, token, hours]
         );
 
         this.token = token;
+
+        console.log(`Generated token ${token} for user id ${this.id}`);
         return token;
     }
 
     static async register(uname: string, email: string, pword: string, perm: number) {
         let user_Q = await sqlQuery(
-            "SELECT uName, uEmail, FROM tblUsers WHERE uName = ? OR uEmail = ?;",
+            "SELECT uName, uEmail FROM tblUsers WHERE uName = ? OR uEmail = ?;",
             [uname, email]
         );
 
@@ -55,7 +57,7 @@ export class User {
 
     static async fromToken(token: string): Promise<User> {
         if (!token || !token.match(TOKEN_FORMAT)) {
-            throw {message: "Invalid Token"}
+            throw { message: "Invalid Token" }
         }
 
         let uID_Q = await sqlQuery("SELECT uID FROM tblTokens WHERE token = ? AND expires > CURRENT_TIMESTAMP();", [token]);
@@ -72,5 +74,17 @@ export class User {
         let perm: number = perm_Q[0].uPerm
 
         return new User(uID, perm, token);
+    }
+
+    static async checkAuth(token: string, requiredPerms: number): Promise<boolean> {
+        console.log(`Authentication attempt with token ${token}`);
+        try {
+            let user: User = await this.fromToken(token);
+            if (user === null)
+                return false;
+            return user.perm <= requiredPerms
+        } catch (e) {
+            return false;
+        }
     }
 }
