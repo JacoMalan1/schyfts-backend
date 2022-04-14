@@ -342,7 +342,7 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
                 }
             }
 
-            tableContents += `<th style="text-align:center;" colspan=${span}>${header[i]}</th>`;
+            tableContents += `<th style="text-align:center;border-top: 4px solid;" colspan=${span}>${header[i]}</th>`;
         }
         tableContents += '</thead>\n';
 
@@ -374,20 +374,15 @@ app.get('/printOut/:id/:sr/:ws', async (req, res) => {
         for (let i = 2; i < lines.length - 1; i++) {
             let fields = lines[i].split(',');
 
-            // if (i - 2 === 3 || i - 2 === 6 || i - 2 === 11) {
-            //     tableContents += '<tr style="border-right: 4px solid white;">\n'
-            // } else {
-            // }
             tableContents += '<tr>';
 
             for (let f of fields) {
                 let bg = (f[0] === '#') ? "#4ca644" : "white";
                 let sub = (f[0] === '#') ? 1 : 0;
                 if ((i - 1) % 2 == 0)
-                    tableContents += `<td style="height:40px;background:${bg};border-bottom: 4px solid;">${f.substr(sub, 15)}</td>`;
+                    tableContents += `<td style="height:40px;background:${bg};border-bottom:4px solid;">${f.substr(sub, 15)}</td>`;
                 else
                     tableContents += `<td style="height:40px;background:${bg};">${f.substr(sub, 15)}</td>`;
-
             }
 
             tableContents += '</tr>\n';
