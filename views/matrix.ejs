@@ -1,10 +1,11 @@
 <html lang="en">
+
 <head>
     <title><%= pageTitle %></title>
     <style>
-	@page {
-	    size: landscape;
-	}
+        @page {
+            size: landscape;
+        }
         @media print {
             @page {
                 size: landscape;
@@ -32,7 +33,7 @@
             text-align: center;
             width: 200%;
         }
-        th, td {
+        th, td, tr {
             border: 1px solid;
             text-align: left;
             padding-top: 0;
@@ -42,29 +43,13 @@
             width: 20px;
             height:10px;
         }
-        #Logo {
-            alignment: left;
-            vertical-align: top;
-            padding-top: 0;
-            padding-bottom: 20px;
-        }
-        #StatsFrom {
-            text-align: left;
-            padding-left: 100px;
-        }
     </style>
 </head>
 
 <body>
-
-<img id="Logo" src="/nelanest.png" width="200" height="43">
-<h3 id="StatsFrom"><%= statsFrom %></h3>
-
-<table style="width: 70%;" id="datatable">
-    <%- tableData %>
-</table>
-
-</br>
-
+    <table style="width: 70%;" id="datatable">
+        <%- tableData %>
+    </table>
 </body>
+
 </html>

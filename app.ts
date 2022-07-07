@@ -303,6 +303,64 @@ app.get('/statistics/:token/:sd/:ed', async (req, res) => {
     });
 });
 
+app.get('/matrix/:token', async (req, res) => {
+    let token = req.params.token;
+
+    if (!token) {
+        res.send('Missing token parameter');
+        return;
+    }
+
+    if (!await User.checkAuth(token, 20)) {
+        res.status(403).end();
+        return;
+    }
+
+    const bucket = storage.bucket('nelanest-roster');
+    const file = bucket.file('matrix.csv');
+    await file.download(async (err, contents) => {
+        if (err) {
+            res.status(404).end();
+            return;
+        }
+
+        const lines = contents.toString().split('\n');
+
+        const cols = lines[0].split(',').length + 1;
+        let table = '<thead><th>Day</th>';
+        for (let i = 1; i < cols; i++)
+            table += '<th>' + i + '</th>';
+        table += '</thead>'
+
+        let days = [
+            'Mon AM', 'Mon PM',
+            'Tue AM', 'Tue PM', '' +
+            'Wed AM', 'Wed PM',
+            'Thu AM', 'Thu PM',
+            'Fri AM', 'Fri PM',
+            'Sat', 'Sun'
+        ];
+
+        let i = 0;
+        for (const line of lines) {
+            if (!line)
+                continue;
+
+            table += '<tr>';
+            table += '<td>' + days[i++] + '</td>';
+
+            for (const col of line.split(','))
+                table += '<td>' + col + '</td>';
+            table += '</tr>';
+        }
+
+        res.render('matrix', {
+            pageTitle: 'Schyfts Matrix',
+            tableData: table,
+        });
+    });
+})
+
 app.get('/printOut/:id/:sr/:ws', async (req, res) => {
     let id = req.params.id;
     let sr = req.params.sr;
