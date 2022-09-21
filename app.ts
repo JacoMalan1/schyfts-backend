@@ -264,27 +264,41 @@ app.get('/statistics/:token/:sd/:ed', async (req, res) => {
     let totals = new Statistic();
     let averages = new Statistic();
 
+    const sharedModules = await sqlQuery("SELECT * FROM tblSharedModules;");
+    const halfWeightDoctors: number[] = [];
+    for (const m of sharedModules) {
+        const ids = JSON.parse(`[${m.doctors}]`);
+        halfWeightDoctors.push(...ids);
+    }
+
+    const numModules = doctors.length - sharedModules.length;
+
     for (let d of doctors) {
+        const weight = halfWeightDoctors.find(element => element === d['id']) === undefined ?
+            1 / numModules : 1 / (2 * numModules);
+
+        // console.log(`Doctor: ${JSON.stringify(d)}\nWeight: ${weight}`);
         for (let i = 0; i < 3; i++) {
             totals.weekdayCalls[i] += statistics[d.id.toString()].weekdayCalls[i];
-            averages.weekdayCalls[i] += statistics[d.id.toString()].weekdayCalls[i];
+            averages.weekdayCalls[i] += statistics[d.id.toString()].weekdayCalls[i] * weight;
         }
         for (let i = 0; i < 3; i++) {
             totals.weekendCalls[i] += statistics[d.id.toString()].weekendCalls[i];
-            averages.weekendCalls[i] += statistics[d.id.toString()].weekendCalls[i];
+            averages.weekendCalls[i] += statistics[d.id.toString()].weekendCalls[i] * weight;
         }
         for (let i = 0; i < 3; i++) {
             totals.holidayCalls[i] += statistics[d.id.toString()].holidayCalls[i];
-            averages.holidayCalls[i] += statistics[d.id.toString()].holidayCalls[i];
+            averages.holidayCalls[i] += statistics[d.id.toString()].holidayCalls[i] * weight;
         }
     }
 
-    for (let i = 0; i < 3; i++)
-        averages.weekdayCalls[i] /= doctors.length - 1;
-    for (let i = 0; i < 3; i++)
-        averages.weekendCalls[i] /= doctors.length - 1;
-    for (let i = 0; i < 3; i++)
-        averages.holidayCalls[i] /= doctors.length - 1;
+    // Doing a weighted sum, so we don't need this
+    // for (let i = 0; i < 3; i++)
+    //     averages.weekdayCalls[i] /= doctors.length - 1;
+    // for (let i = 0; i < 3; i++)
+    //     averages.weekendCalls[i] /= doctors.length - 1;
+    // for (let i = 0; i < 3; i++)
+    //     averages.holidayCalls[i] /= doctors.length - 1;
 
     let tableContents = '';
     tableContents += Statistic.getTableHeader();
