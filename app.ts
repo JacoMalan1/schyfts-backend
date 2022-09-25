@@ -230,9 +230,9 @@ app.get('/statistics/:token/:sd/:ed', async (req, res) => {
     for (let cd of callData) {
         let date = new Date(cd.date);
         if (date.getMonth() === 11 && (date.getDate() === 25 || date.getDate() === 26)) {
-            statistics[cd.dID.toString()].addChristmasCall(cd.value);
+            statistics[cd.dID.toString()].addChristmasCall(cd.value); // Christmas
         } else if (date.getMonth() === 0 && date.getDate() === 1) {
-            statistics[cd.dID.toString()].addNewYearCall(cd.value);
+            statistics[cd.dID.toString()].addNewYearCall(cd.value); // New Year
         } else {
             let isHoliday = false;
             let isEaster = false;
@@ -251,13 +251,14 @@ app.get('/statistics/:token/:sd/:ed', async (req, res) => {
             else if (isEaster) {
                 statistics[cd.dID.toString()].addEasterCall(cd.value);
             }
-            else {
-                if (date.getDay() in [ 0, 6 ]) {
-                    statistics[cd.dID.toString()].addWeekendCall(cd.value);
-                } else {
-                    statistics[cd.dID.toString()].addWeekdayCall(cd.value);
-                }
+        }
+        const day = date.getDay()
+        if (day === 5 || day == 6 || day == 0) {
+            if (date.getDay() === 5) {
+                statistics[cd.dID.toString()].addWeekendCall(cd.value);
             }
+        } else {
+            statistics[cd.dID.toString()].addWeekdayCall(cd.value);
         }
     }
 
