@@ -1,3 +1,5 @@
+<% var pageTitle; var pages; var scheduleHeading; var doctorInfo; %>
+
 <html lang="en">
     <head>
         <title><%= pageTitle %></title>
@@ -60,20 +62,29 @@
     </head>
 
     <body>
-        <h1 id="ScheduleHeading"><%= scheduleHeading %></h1>
-        <img id="Logo" src="/nelanest.png" width="300" height="64">
-        <h2 id="InfoBanner">Suite 102, Sonheuwel Rooms, Nelspruit Mediclinic, Phone (013 745 7082) Email: nelanest@telkomsa.net</h2>
-        <h2 id="WeekStarting"><%= weekStarting %></h2>
+        <% pages = pages.sort((a, b) => a.offset - b.offset);
+        for (let i = 0; i < pages.length; i++) {
+            var tableData = pages[i].tableContents;
+            var weekStarting = pages[i].sd;
+        %>
+            <h1 id="ScheduleHeading"><%= scheduleHeading %></h1>
+            <img id="Logo" src="/nelanest.png" width="300" height="64">
+            <h2 id="InfoBanner">Suite 102, Sonheuwel Rooms, Nelspruit Mediclinic, Phone (013 745 7082) Email: nelanest@telkomsa.net</h2>
+            <h2 id="WeekStarting">Week Starting: <%= weekStarting %></h2>
 
-        <table style="width: 70%;" id="datatable">
-            <%- tableData %>
-        </table>
-        
-        </br>
+            <table style="width: 70%;" id="datatable">
+                <%- tableData %>
+            </table>
 
-        <table id="doctorInfo" style="width:100%">
-            <%- doctorInfo %>
-        </table>
+            <br>
+
+            <table id="doctorInfo" style="width:100%">
+                <%- doctorInfo %>
+            </table>
+            <% if (i !== pages.length - 1) {%>
+                <br><br><br><br><br><br><br><br><br>
+            <%}%>
+        <% } %>
 
         <script>
             window.print();
