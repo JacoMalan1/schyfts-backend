@@ -64,7 +64,7 @@
     <body>
         <% pages = pages.sort((a, b) => a.offset - b.offset);
         for (let i = 0; i < pages.length; i++) {
-            var tableData = pages[i].tableContents;
+           var tableData = pages[i].tableContents;
             var weekStarting = pages[i].sd;
         %>
             <h1 id="ScheduleHeading"><%= scheduleHeading %></h1>

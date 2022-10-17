@@ -386,7 +386,8 @@ app.get('/printOut/:id', async (req, res) => {
     let bucket = storage.bucket('nelanest-roster');
     let [ files ] = await bucket.getFiles({ prefix: `render_tmp/${req.params.id}` });
 
-    const pages: any[] = [];
+    let pages: any[] = [];
+    let sdArr = [];
     files = files.sort((a, b) => a.name.localeCompare(b.name))
     for (const file of files) {
         const split = file.name.split('_');
@@ -394,95 +395,89 @@ app.get('/printOut/:id', async (req, res) => {
         const sd = split[2];
         const timestamp = new Date(parseInt(sd.split('-')[2]), parseInt(sd.split('-')[1]) - 1, parseInt(sd.split('-')[0])).getTime();
         const newTimestamp = timestamp + offset * 7 * 24 * 60 * 60 * 1000; // Add 'offset' number of weeks to timestamp;
-        const newSd = new Date(newTimestamp).toLocaleDateString();
-        pages.push({ offset, sd: newSd });
+        const newSd = new Date(newTimestamp);
+        sdArr[offset] = `${newSd.getMonth() + 1}-${newSd.getDate()}-${newSd.getFullYear()}`;
     }
 
     for (const file of files) {
         const split = file.name.split('_');
         const offset = parseInt(split[4].substring(0, 1));
-        file.download(async (err, contents) => {
+        console.log(`Offset to compare against: ${offset}`);
+        const [ contents ] = await file.download();
 
-            if (err !== null) {
-                res.status(404).send("Couldn't find a roster with that ID!");
-            }
+        let tableContents = '';
+        let lines = contents.toString().split('\n');
+        let header = lines[0].split(',');
+        let doctorNames = lines[1].split(',');
 
-            let tableContents = '';
-            let lines = contents.toString().split('\n');
-            let header = lines[0].split(',');
-            let doctorNames = lines[1].split(',');
+        let separators = [0, 4, 8, 13, 17, 20];
 
-            let separators = [0, 4, 8, 13, 17, 20];
+        tableContents += '<thead>';
+        for (let i = 0; i < header.length; i++) {
+            if (header[i] === '')
+                continue;
 
-            tableContents += '<thead>';
-            for (let i = 0; i < header.length; i++) {
-                if (header[i] === '')
-                    continue;
+            let span = (header[i + 1] === '') ? 2 : 1;
 
-                let span = (header[i + 1] === '') ? 2 : 1;
-
-                for (let j = 0; j < separators.length; j++) {
-                    if (separators[j] === i) {
-                        if (span > 1) {
-                            separators[j] += 1;
-                        }
+            for (let j = 0; j < separators.length; j++) {
+                if (separators[j] === i) {
+                    if (span > 1) {
+                        separators[j] += 1;
                     }
                 }
-
-                tableContents += `<th style="text-align:center;border-top: 4px solid;" colspan=${span}>${header[i]}</th>`;
             }
-            tableContents += '</thead>\n';
 
-            let colgroup = '';
-            colgroup += '<colgroup>';
-            for (let i = 0; i < header.length; i++) {
-                let doSep = false;
-                for (let sep of separators) {
-                    if (sep === i) {
-                        doSep = true;
-                        break;
-                    }
+            tableContents += `<th style="text-align:center;border-top: 4px solid;" colspan=${span}>${header[i]}</th>`;
+        }
+        tableContents += '</thead>\n';
+
+        let colgroup = '';
+        colgroup += '<colgroup>';
+        for (let i = 0; i < header.length; i++) {
+            let doSep = false;
+            for (let sep of separators) {
+                if (sep === i) {
+                    doSep = true;
+                    break;
                 }
-                if (doSep)
-                    colgroup += '<col style="width:50px;border-right:4px solid;">';
-
-                else
-                    colgroup += '<col style="width:50px;">\n';
             }
-            colgroup += '</colgroup>\n';
+            if (doSep)
+                colgroup += '<col style="width:50px;border-right:4px solid;">';
 
-            tableContents = colgroup + tableContents;
+            else
+                colgroup += '<col style="width:50px;">\n';
+        }
+        colgroup += '</colgroup>\n';
+
+        tableContents = colgroup + tableContents;
+
+        tableContents += '<tr>';
+        for (let i = 0; i < doctorNames.length; i++) {
+            tableContents += `<td style="text-align:center;font-weight:bold;border-bottom: 4px solid;">${doctorNames[i]}</td>`;
+        }
+        tableContents += '</tr>';
+
+        for (let i = 2; i < lines.length - 1; i++) {
+            let fields = lines[i].split(',');
 
             tableContents += '<tr>';
-            for (let i = 0; i < doctorNames.length; i++) {
-                tableContents += `<td style="text-align:center;font-weight:bold;border-bottom: 4px solid;">${doctorNames[i]}</td>`;
-            }
-            tableContents += '</tr>';
 
-            for (let i = 2; i < lines.length - 1; i++) {
-                let fields = lines[i].split(',');
-
-                tableContents += '<tr>';
-
-                for (let f of fields) {
-                    let bg = (f[0] === '#') ? "#4ca644" : "white";
-                    let sub = (f[0] === '#') ? 1 : 0;
-                    if ((i - 1) % 2 == 0)
-                        tableContents += `<td style="height:40px;background:${bg};border-bottom:4px solid;">${f.substr(sub, 15)}</td>`;
-
-                    else
-                        tableContents += `<td style="height:40px;background:${bg};">${f.substr(sub, 15)}</td>`;
-                }
-
-                tableContents += '</tr>\n';
+            for (let f of fields) {
+                let bg = (f[0] === '#') ? "#4ca644" : "white";
+                let sub = (f[0] === '#') ? 1 : 0;
+                if ((i - 1) % 2 == 0)
+                    tableContents += `<td style="height:40px;background:${bg};border-bottom:4px solid;">${f.substr(sub, 15)}</td>`;
+                else
+                    tableContents += `<td style="height:40px;background:${bg};">${f.substr(sub, 15)}</td>`;
             }
 
-            for (let i = 0; i < pages.length; i++) {
-                if (pages[i].offset === offset)
-                    pages[i].tableContents = tableContents;
-            }
-        });
+            tableContents += '</tr>\n';
+        }
+
+        pages.push({ offset, sd: sdArr[offset], tableContents });
     }
+
+    pages = pages.sort((a, b) => a.offset - b.offset);
 
     let doctors = await sqlQuery("SELECT * FROM tblDoctors ORDER BY surname, name");
     let doctorTableData = '<tr>';
@@ -498,6 +493,8 @@ app.get('/printOut/:id', async (req, res) => {
     doctorTableData += '</tr>';
 
     const split = files[0].name.split('_');
+
+    console.log(pages);
     res.render('printOut', {
         scheduleHeading: `${split[2].replace(/-/g, '/')} - ${split[3].replace(/-/g, '/')}`,
         pageTitle: 'Schyfts Renderer',
