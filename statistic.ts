@@ -50,6 +50,12 @@ export class Statistic {
             result += `${td}${this.weekdayCalls[i].toString()}</td>`;
         for (let i = 0; i < 3; i++)
             result += `${td}${this.weekendCalls[i].toString()}</td>`
+
+        let total = 0;
+        for (let i = 0; i < 3; i++)
+            total += this.weekendCalls[i];
+        result += `${td}${total}</td>`;
+
         for (let i = 0; i < 3; i++)
             result += `${td}${this.holidayCalls[i].toString()}</td>`;;
         for (let i = 0; i < 3; i++)
@@ -72,6 +78,9 @@ export class Statistic {
             result += `${th}Call ${i + 1}</th>`;
         for (let i = 0; i < 3; i++)
             result += `${th}Weekend Call ${i + 1}</th>`;
+
+        result += `${th}W/E Call Totals</th>`;
+
         for (let i = 0; i < 3; i++)
             result += `${th}Holiday Call ${i + 1}</th>`;
         for (let i = 0; i < 3; i++)
@@ -94,6 +103,12 @@ export class Statistic {
             result += `${td}${this.weekdayCalls[i].toString()}</td>`;
         for (let i = 0; i < 3; i++)
             result += `${td}${this.weekendCalls[i].toString()}</td>`;
+
+        let total = 0;
+        for (let i = 0; i < 3; i++)
+            total += this.weekendCalls[i];
+        result += `${td}${total}</td>`;
+
         for (let i = 0; i < 3; i++)
             result += `${td}${this.holidayCalls[i].toString()}</td>`;
 
@@ -110,6 +125,13 @@ export class Statistic {
             result += `${td}${this.weekdayCalls[i].toFixed(2).toString()}</td>`;
         for (let i = 0; i < 3; i++)
             result += `${td}${this.weekendCalls[i].toFixed(2).toString()}</td>`;
+
+        let total = 0;
+        for (let i = 0; i < 3; i++)
+            total += this.weekendCalls[i];
+
+        result += `${td}${total.toFixed(2)}</td>`;
+
         for (let i = 0; i < 3; i++)
             result += `${td}${this.holidayCalls[i].toFixed(2).toString()}</td>`;
 
