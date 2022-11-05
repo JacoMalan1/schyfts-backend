@@ -12,6 +12,9 @@
                 body {
                     margin: 1.6cm 0 1.6cm 0;
                 }
+                .doctorInfo {
+                    page-break-after: always;
+                }
             }
             * {
                 font-family: 'Times New Roman', serif;
@@ -78,12 +81,9 @@
 
             <br>
 
-            <table id="doctorInfo" style="width:100%">
+            <table class="doctorInfo" style="width:100%">
                 <%- doctorInfo %>
             </table>
-            <% if (i !== pages.length - 1) {%>
-                <br><br><br><br><br><br><br><br><br>
-            <%}%>
         <% } %>
 
         <script>
