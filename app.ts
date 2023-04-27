@@ -5,10 +5,10 @@ import * as mysql from "mysql";
 import { User } from "./user";
 import { Statistic } from "./statistic";
 import { strToIntArr } from "./util";
-import {sqlCommit, sqlQuery, sqlRollback, sqlStartTransaction} from "./sql";
+import { sqlCommit, sqlQuery, sqlRollback, sqlStartTransaction } from "./sql";
 import { Storage } from "@google-cloud/storage";
 import RateLimit from "express-rate-limit";
-import {APIResponse} from "./APIResponse";
+import { APIResponse } from "./APIResponse";
 
 require('dotenv').config();
 
@@ -68,27 +68,27 @@ app.set('views', './views');
 app.set('view engine', 'ejs')
 
 app.post('/getCallData', async (req, res) => {
-   let token = req.body.token;
-   let startDate = req.body.start;
-   let endDate = req.body.end;
+    let token = req.body.token;
+    let startDate = req.body.start;
+    let endDate = req.body.end;
 
-   if (!token || !startDate || !endDate) {
-       res.json(new APIResponse(false, "Missing parameters"));
-       return;
-   }
+    if (!token || !startDate || !endDate) {
+        res.json(new APIResponse(false, "Missing parameters"));
+        return;
+    }
 
-   if (!await User.checkAuth(token, 10)) {
-       res.json(new APIResponse(false, "Authentication failure"));
-       return;
-   }
+    if (!await User.checkAuth(token, 10)) {
+        res.json(new APIResponse(false, "Authentication failure"));
+        return;
+    }
 
-   try {
-       let results = await sqlQuery("SELECT date, dID, value FROM tblCalls WHERE date >= ? AND date <= ?",
-           [startDate, endDate]);
-       res.json(new APIResponse(true, `Got ${results.length} results`, { results }));
-   } catch (e) {
-       res.json(new APIResponse(false, "An unknown server error occurred"));
-   }
+    try {
+        let results = await sqlQuery("SELECT date, dID, value FROM tblCalls WHERE date >= ? AND date <= ?",
+            [startDate, endDate]);
+        res.json(new APIResponse(true, `Got ${results.length} results`, { results }));
+    } catch (e) {
+        res.json(new APIResponse(false, "An unknown server error occurred"));
+    }
 });
 
 app.post('/updateCallRegistry', async (req, res) => {
@@ -384,7 +384,7 @@ app.get('/printOut/:id', async (req, res) => {
     }
 
     let bucket = storage.bucket('nelanest-roster');
-    let [ files ] = await bucket.getFiles({ prefix: `render_tmp/${req.params.id}` });
+    let [files] = await bucket.getFiles({ prefix: `render_tmp/${req.params.id}` });
 
     let pages: any[] = [];
     let sdArr = [];
@@ -403,14 +403,14 @@ app.get('/printOut/:id', async (req, res) => {
         const split = file.name.split('_');
         const offset = parseInt(split[4].substring(0, 1));
         console.log(`Offset to compare against: ${offset}`);
-        const [ contents ] = await file.download();
+        const [contents] = await file.download();
 
         let tableContents = '';
         let lines = contents.toString().split('\n');
         let header = lines[0].split(',');
         let doctorNames = lines[1].split(',');
 
-        let separators = [0, 4, 8, 13, 17, 20];
+        let separators = [0, 18, 21];
 
         tableContents += '<thead>';
         for (let i = 0; i < header.length; i++) {
@@ -587,9 +587,9 @@ app.get('/cleanUp', async (req, res) => {
             }
             res.json({ status: "ok", message: `Deleted ${toDelete.length} files from "render_tmp/"` });
         }).catch(err => {
-        res.status(500).json({ status: "error", message: "An unknown error has occurred" });
-        console.error(err);
-    });
+            res.status(500).json({ status: "error", message: "An unknown error has occurred" });
+            console.error(err);
+        });
 });
 
 function checkUser(user, perms): Promise<boolean> {
@@ -600,8 +600,8 @@ function checkUser(user, perms): Promise<boolean> {
         }
 
         if (perms !== null && user.permissionLevel >= perms) {
-                resolve(false);
-                return;
+            resolve(false);
+            return;
         }
 
         resolve(true);
@@ -629,7 +629,7 @@ app.post('/addCall', async (req, res) => {
         await sqlQuery("INSERT INTO tblCalls (date, value, dID) VALUES (?, ?, ?);", [date, value, dID]);
         res.json({ status: "ok", message: "Added call", ack: { date, value, dID } });
     } catch (e) {
-        res.status(500).json({status: "error", message: `Server error: ${e}`});
+        res.status(500).json({ status: "error", message: `Server error: ${e}` });
     }
 });
 
@@ -659,7 +659,7 @@ app.post('/deleteCall', async (req, res) => {
     let id = req.body.id;
 
     if (!id || !token) {
-        res.json({ status:"error", code: 1, message: error_codes[1] });
+        res.json({ status: "error", code: 1, message: error_codes[1] });
         return;
     }
 
@@ -780,7 +780,7 @@ app.post('/addDoctor', async (req, res) => {
 
     let shortcodeFormat = /^\*\d{5}$/;
     if (!shortcode.match(shortcodeFormat)) {
-        res.json({ status: "error", code: 41 , message: error_codes[41] }).end();
+        res.json({ status: "error", code: 41, message: error_codes[41] }).end();
         return;
     }
 
@@ -989,7 +989,7 @@ app.post('/getDoctor', async (req, res) => {
     let surname = body.surname;
     let token = body.token;
 
-    if (token === undefined || surname === undefined || token.length <= 0 || surname .length <= 0) {
+    if (token === undefined || surname === undefined || token.length <= 0 || surname.length <= 0) {
         res.json({ status: "error", code: 11, message: error_codes[11] }).end();
         return;
     }
@@ -1012,7 +1012,7 @@ app.post('/getDoctor', async (req, res) => {
         let uID = results[0].uID;
         results = await sqlQuery("SELECT uPerm FROM tblUsers WHERE uID = ?;", [uID]);
         if (results[0].uPerm > 19) {
-            res.json({status: "error", code: 1, message: error_codes[1]}).end();
+            res.json({ status: "error", code: 1, message: error_codes[1] }).end();
             return;
         }
 
@@ -1020,7 +1020,7 @@ app.post('/getDoctor', async (req, res) => {
         res.json({ status: "ok", message: `${results.length} results found`, results }).end();
 
     } else {
-        res.json({ status: "error", code: 25,message: error_codes[25] }).end();
+        res.json({ status: "error", code: 25, message: error_codes[25] }).end();
     }
 
 });
@@ -1085,7 +1085,7 @@ app.post('/setSetting', async (req, res) => {
     let value = body.value;
 
     if (!token || key === undefined || value === undefined) {
-        res.json({status: "error", code: 11, message: error_codes[11]}).end();
+        res.json({ status: "error", code: 11, message: error_codes[11] }).end();
         return;
     }
 
@@ -1100,7 +1100,7 @@ app.post('/setSetting', async (req, res) => {
             await sqlQuery("UPDATE tblOptions SET `value` = ? WHERE key_string = ?", [value, key]);
             res.json({ status: "ok", message: "Setting updated", ack: { key_string: key, value } });
         } else {
-            await sqlQuery("INSERT INTO tblOptions (key_string, `value`) VALUES (?, ?)", [key, value]);            res.json({ status: "ok", message: "Setting updated", ack: { key, value } });
+            await sqlQuery("INSERT INTO tblOptions (key_string, `value`) VALUES (?, ?)", [key, value]);
             res.json({ status: "ok", message: "Setting created", ack: { key_string: key, value } });
         }
     } catch (e) {
@@ -1173,7 +1173,7 @@ app.post('/login', async (req, res) => {
         if (same) {
             let user = new User(id, permissionLevel);
             let token = await user.makeToken(10);
-            res.json(new APIResponse(true, "Logged in", { token, permissionLevel: userInfo[0].uPerm}));
+            res.json(new APIResponse(true, "Logged in", { token, permissionLevel: userInfo[0].uPerm }));
         } else {
             console.log(`Authentication failure for user id ${id}`);
             res.json(new APIResponse(false, "Incorrect password"));
